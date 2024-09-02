@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Summarise with ChatGPT",
+  "name": "Summarise with GPT-4o",
   "version": "1.1",
   "description": "Copies text from the page or YouTube transcript and summarises it using the ChatGPT API.",
   "permissions": [
@@ -14,18 +14,13 @@
     "https://www.youtube.com/*"
   ],
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": "summarise.png"
   },
   "options_page": "options.html",
   "icons": {
-    "48": "icon.png"
+    "48": "summarise.png"
   },
-  "content_scripts": [
-    {
-      "matches": ["https://www.youtube.com/*"],
-      "js": ["youtubeTranscript.js"]
-    }
-  ],
   "background": {
     "service_worker": "background.js"
   }
