@@ -16,7 +16,7 @@ A Chrome extension that summarises web pages and YouTube transcripts using GPT-4
 
 1. Clone the repository using Git:
    ```bash
-   git clone https://github.com/your-username/chrome-summarise-gpt.git
+   git clone https://github.com/adamlove86/chrome-gpt-summary.git
    ```
 
 2. Alternatively, you can download the repository as a ZIP file and extract it.
