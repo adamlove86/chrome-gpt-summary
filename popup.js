@@ -1,11 +1,15 @@
 // popup.js
 
+let summaryWindow;
+
 document.getElementById('summariseBtn').addEventListener('click', () => {
   chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
     const currentTab = tabs[0];
     if (currentTab && currentTab.url && currentTab.url.includes('youtube.com/watch')) {
       chrome.tabs.sendMessage(currentTab.id, { action: "extractTranscript" });
     } else if (currentTab && currentTab.id) {
+      // Open summary window immediately
+      openSummaryWindow(currentTab.url);
       chrome.scripting.executeScript({
         target: { tabId: currentTab.id },
         function: extractTextAndSummarise
@@ -28,7 +32,7 @@ function extractTextAndSummarise() {
     }
   });
 
-  chrome.runtime.sendMessage({ action: "summariseText", text: text.trim(), pageUrl: window.location.href });
+  chrome.runtime.sendMessage({ action: "summariseText", text: text.trim(), pageUrl: window.location.href, contentType: "text" });
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -36,41 +40,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     displaySummary(request.summary, request.pageUrl);
   } else if (request.action === "transcriptError") {
     alert("Error extracting YouTube transcript: " + request.error);
+  } else if (request.action === "openSummaryWindow") {
+    openSummaryWindow(request.pageUrl);
+  } else if (request.action === "displayError") {
+    displayError(request.error, request.pageUrl);
   }
 });
 
-function displaySummary(summary, pageUrl) {
-  const htmlSummary = convertMarkdownToHtml(summary);
-
-  // Open each summary in a new window
-  const summaryWindow = window.open('', '_blank', 'width=600,height=600');
+function openSummaryWindow(pageUrl) {
+  summaryWindow = window.open('', '_blank', 'width=600,height=600');
 
   summaryWindow.document.write(`
     <html>
       <head>
-        <title>Page Summary</title>
+        <title>Summarising...</title>
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; max-height: 500px; overflow-y: auto; }
-          h2 { color: #2c3e50; margin-bottom: 20px; }
-          ul { padding-left: 20px; list-style-type: none; }
-          li { margin-bottom: 10px; }
-          li.level-1::before { content: "•"; color: #3498db; display: inline-block; width: 1em; margin-left: -1em; }
-          li.level-2::before { content: "◦"; color: #e74c3c; display: inline-block; width: 1em; margin-left: -1em; }
-          li.level-3::before { content: "▪"; color: #2ecc71; display: inline-block; width: 1em; margin-left: -1em; }
-          .level-2 { margin-left: 20px; }
-          .level-3 { margin-left: 40px; }
-          strong { color: #34495e; }
-          em { font-style: italic; }
-          .red { color: #e74c3c; }
-          .blue { color: #1e90ff; } /* Brighter blue */
-          .green { color: #2ecc71; }
-          .orange { color: #f39c12; }
           .footer { margin-top: 20px; font-size: 0.9em; color: #555; }
           .footer a { color: #3498db; text-decoration: none; }
         </style>
       </head>
       <body>
-        ${htmlSummary}
+        <p>Loading summary...</p>
         <div class="footer">
           <p>Original page: <a href="${pageUrl}" target="_blank">${pageUrl}</a></p>
         </div>
@@ -80,24 +71,59 @@ function displaySummary(summary, pageUrl) {
   summaryWindow.document.close();
 }
 
+function displaySummary(summary, pageUrl) {
+  const htmlSummary = convertMarkdownToHtml(summary);
+
+  // Update the summary window content
+  if (summaryWindow && !summaryWindow.closed) {
+    summaryWindow.document.body.innerHTML = `
+      ${htmlSummary}
+      <div class="footer">
+        <p>Original page: <a href="${pageUrl}" target="_blank">${pageUrl}</a></p>
+      </div>
+    `;
+  } else {
+    // If the window wasn't opened, open it now
+    openSummaryWindow(pageUrl);
+    summaryWindow.document.body.innerHTML = `
+      ${htmlSummary}
+      <div class="footer">
+        <p>Original page: <a href="${pageUrl}" target="_blank">${pageUrl}</a></p>
+      </div>
+    `;
+  }
+}
+
+function displayError(errorMessage, pageUrl) {
+  // Open a new window to display the error
+  const errorWindow = window.open('', '_blank', 'width=600,height=400');
+
+  errorWindow.document.write(`
+    <html>
+      <head>
+        <title>Error</title>
+      </head>
+      <body>
+        <h1>An error occurred</h1>
+        <p>${errorMessage}</p>
+        <div class="footer">
+          <p>Page URL: <a href="${pageUrl}" target="_blank">${pageUrl}</a></p>
+        </div>
+      </body>
+    </html>
+  `);
+  errorWindow.document.close();
+}
+
 function convertMarkdownToHtml(markdown) {
-  // Convert headers
-  markdown = markdown.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+  // Convert headers with italic
+  markdown = markdown.replace(/^### \*(.*)\*/gim, '<h3><em>$1</em></h3>');
+  markdown = markdown.replace(/^## \*(.*)\*/gim, '<h2><em>$1</em></h2>');
+  markdown = markdown.replace(/^# \*(.*)\*/gim, '<h1><em>$1</em></h1>');
 
   // Convert bold and italic
   markdown = markdown.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
   markdown = markdown.replace(/\*(.*?)\*/g, '<em>$1</em>');
-
-  // Convert nested lists
-  markdown = markdown.replace(/^(\s*)-\s(.*$)/gim, '<li class="level-1">$2</li>');
-  markdown = markdown.replace(/^(\s*)\*\s(.*$)/gim, '<li class="level-2">$2</li>');
-  markdown = markdown.replace(/^(\s*)\+\s(.*$)/gim, '<li class="level-3">$2</li>');
-
-  // Wrap lists in <ul> tags
-  markdown = markdown.replace(/(<li class="level-\d+">.*<\/li>)/g, '<ul>$1</ul>');
-
-  // Remove extra <ul> tags
-  markdown = markdown.replace(/<\/ul>\s*<ul>/g, '');
 
   // Convert colour syntax
   markdown = markdown.replace(/<red>(.*?)<\/red>/g, '<span class="red">$1</span>');
