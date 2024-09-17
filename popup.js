@@ -1,3 +1,5 @@
+// popup.js
+
 document.getElementById('summariseBtn').addEventListener('click', () => {
   chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
     const currentTab = tabs[0];
@@ -13,24 +15,36 @@ document.getElementById('summariseBtn').addEventListener('click', () => {
 });
 
 function extractTextAndSummarise() {
-  const text = document.body.innerText;
-  chrome.runtime.sendMessage({ action: "summariseText", text: text });
+  // Improved text extraction
+  let text = '';
+  const elements = document.body.querySelectorAll('*');
+
+  elements.forEach(element => {
+    const computedStyle = window.getComputedStyle(element);
+    if (computedStyle.display !== 'none' && computedStyle.visibility !== 'hidden') {
+      if (element.innerText) {
+        text += element.innerText + ' ';
+      }
+    }
+  });
+
+  chrome.runtime.sendMessage({ action: "summariseText", text: text.trim(), pageUrl: window.location.href });
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "transcriptExtracted") {
-    chrome.runtime.sendMessage({ action: "summariseText", text: request.transcript });
+  if (request.action === "displaySummary") {
+    displaySummary(request.summary, request.pageUrl);
   } else if (request.action === "transcriptError") {
     alert("Error extracting YouTube transcript: " + request.error);
-  } else if (request.action === "displaySummary") {
-    displaySummary(request.summary);
   }
 });
 
-function displaySummary(summary) {
+function displaySummary(summary, pageUrl) {
   const htmlSummary = convertMarkdownToHtml(summary);
 
-  const summaryWindow = window.open('', 'Summary', 'width=600,height=600');
+  // Open each summary in a new window
+  const summaryWindow = window.open('', '_blank', 'width=600,height=600');
+
   summaryWindow.document.write(`
     <html>
       <head>
@@ -48,13 +62,18 @@ function displaySummary(summary) {
           strong { color: #34495e; }
           em { font-style: italic; }
           .red { color: #e74c3c; }
-          .blue { color: #3498db; }
+          .blue { color: #1e90ff; } /* Brighter blue */
           .green { color: #2ecc71; }
           .orange { color: #f39c12; }
+          .footer { margin-top: 20px; font-size: 0.9em; color: #555; }
+          .footer a { color: #3498db; text-decoration: none; }
         </style>
       </head>
       <body>
         ${htmlSummary}
+        <div class="footer">
+          <p>Original page: <a href="${pageUrl}" target="_blank">${pageUrl}</a></p>
+        </div>
       </body>
     </html>
   `);

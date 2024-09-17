@@ -23,12 +23,26 @@ def suggest_next_versions(current_version):
 
     return suggested_major, suggested_minor, suggested_patch
 
+def read_multiline_input(prompt):
+    print(prompt)
+    print("Enter your commit message. End with an empty line:")
+    lines = []
+    while True:
+        try:
+            line = input()
+            if line == '':
+                break
+            lines.append(line)
+        except EOFError:
+            break
+    return '\n'.join(lines)
+
 def commit_and_push(version, changes):
     # Add all changes
     subprocess.run(['git', 'add', '.'])
 
     # Commit the changes with the provided message
-    commit_message = f'Release v{version} - {changes}'
+    commit_message = f'Release v{version}\n\n{changes}'
     subprocess.run(['git', 'commit', '-m', commit_message])
 
     # Tag the new version
@@ -50,11 +64,11 @@ def main():
     # Ask for the new version (use one of the suggestions or enter your own)
     new_version = input(f"Enter the new version (default is {suggested_minor}): ").strip() or suggested_minor
 
-    # Ask for the changes (in quotations for multi-line)
-    changes = input('Enter the changes (in "quotation marks" if multi-line): ').strip()
+    # Ask for the changes
+    changes = read_multiline_input('Enter the changes (plain text code changelog without empty lines or double spacing):')
 
     # Confirm and commit
-    print(f"\nUploading version {new_version} with the following changes: {changes}")
+    print(f"\nUploading version {new_version} with the following changes:\n{changes}")
     confirm = input("Confirm commit and push? (y/n): ").strip().lower()
     if confirm == 'y':
         commit_and_push(new_version, changes)

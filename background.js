@@ -4,7 +4,7 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: "summarise",
     title: "Summarise with ChatGPT",
-    contexts: ["all"]
+    contexts: ["page", "selection", "link"]
   }, function() {
     if (chrome.runtime.lastError) {
       console.error("Context menu creation failed: " + chrome.runtime.lastError.message);
@@ -15,7 +15,13 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === "summarise") {
     try {
-      if (tab && tab.url && tab.url.includes('youtube.com/watch')) {
+      if (info.linkUrl) {
+        // Summarize the content at the hyperlink
+        fetchAndSummarizeLink(info.linkUrl);
+      } else if (info.selectionText) {
+        // Summarize the highlighted text
+        summariseText(info.selectionText, tab.url);
+      } else if (tab && tab.url && tab.url.includes('youtube.com/watch')) {
         chrome.tabs.sendMessage(tab.id, { action: "extractTranscript" });
       } else if (tab && tab.id) {
         await chrome.scripting.executeScript({
@@ -43,18 +49,18 @@ function extractTextAndSummarise() {
     }
   });
 
-  chrome.runtime.sendMessage({ action: "summariseText", text: text.trim() });
+  chrome.runtime.sendMessage({ action: "summariseText", text: text.trim(), pageUrl: window.location.href });
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "summariseText") {
-    summariseText(request.text);
+    summariseText(request.text, request.pageUrl);
   } else if (request.action === "transcriptExtracted") {
-    summariseText(request.text);
+    summariseText(request.text, request.pageUrl);
   }
 });
 
-async function summariseText(text) {
+async function summariseText(text, pageUrl) {
   chrome.storage.sync.get(["apiKey", "prompt", "model", "maxTokens", "temperature", "debug"], async (data) => {
     const apiKey = data.apiKey || "";
     const prompt = data.prompt || "Summarise the following text:";
@@ -112,7 +118,7 @@ async function summariseText(text) {
       }
 
       const summary = result.choices[0].message.content.trim();
-      chrome.runtime.sendMessage({ action: "displaySummary", summary: summary });
+      chrome.runtime.sendMessage({ action: "displaySummary", summary: summary, pageUrl: pageUrl });
     } catch (error) {
       console.error("Error summarising text:", error);
       if (debug) {
@@ -127,6 +133,23 @@ async function summariseText(text) {
 function estimateTokens(text) {
   // Rough estimate: 1 token ≈ 4 characters
   return Math.ceil(text.length / 4);
+}
+
+async function fetchAndSummarizeLink(linkUrl) {
+  try {
+    const response = await fetch(linkUrl);
+    const text = await response.text();
+
+    // Remove HTML tags to get plain text
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(text, 'text/html');
+    const pageText = doc.body.innerText;
+
+    summariseText(pageText, linkUrl);
+  } catch (error) {
+    console.error('Error fetching link:', error);
+    alert('Failed to fetch and summarize the link.');
+  }
 }
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
