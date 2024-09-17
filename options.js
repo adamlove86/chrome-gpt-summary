@@ -1,3 +1,5 @@
+// options.js
+
 document.addEventListener('DOMContentLoaded', () => {
   chrome.storage.sync.get(["apiKey", "prompt", "model", "maxTokens", "temperature", "debug"], (data) => {
     document.getElementById('apiKey').value = data.apiKey || '';
@@ -24,20 +26,32 @@ document.getElementById('settingsForm').addEventListener('submit', (e) => {
 });
 
 function getDefaultPrompt() {
-  return `Summarize the following text, copied from a web page. Present the summary as a concise, nested list of key points, using Markdown formatting for better readability. Follow these guidelines strictly:
+  return `Summarize the following transcript from a YouTube video. Present the summary as a detailed narrative, accurately capturing the key points and flow of the content. Follow these guidelines strictly:
 
-1. Use a level 2 heading (##) for the main title "Key Points Summary"
-2. Use bold (**text**) for important terms or concepts
-3. Use italic (*text*) for emphasis where appropriate
-4. Use nested bullet points for listing items, with a maximum of three levels:
-   - First level: -
-   - Second level: *
-   - Third level: +
-5. Use color syntax for highlighting, applying colors ONLY as follows:
-   - <red>text</red> for warnings or critical points
-   - <blue>text</blue> for definitions or key concepts
-   - <green>text</green> for positive aspects or benefits
-   - <orange>text</orange> for cautionary notes or potential issues
+1. **Overview Section**:
+   - Begin with a brief summary paragraph covering the main points of the entire video.
+   - Use the format: \`0:00:00 - [Video Duration]\` at the beginning of this section.
+   - Focus on the main topic and key findings, ensuring the overview reflects the video's primary content without overemphasizing background information.
 
-Ensure the summary is concise and well-structured, using colors sparingly and ONLY for their designated purposes. Adhere strictly to Markdown syntax for all formatting.`;
+2. **Detailed Sections**:
+   - Break down the content into logical sections based on shifts in topics or themes.
+   - Use approximate time stamps for each section (e.g., \`0:00\`, \`1:30\`).
+   - Start each section with the relevant time stamp followed by a concise summary of that segment.
+   - Ensure that the sections collectively cover the entire video content without omissions.
+   - Use complete sentences and maintain a clear, narrative flow.
+
+3. **Formatting Guidelines**:
+   - Use **bold** to emphasize important terms, concepts, or breakthroughs.
+   - Use *italic* to highlight supplementary or nuanced points.
+   - Highlight critical points or warnings using \`<red>\`...\`</red>\`.
+   - Highlight key definitions or important concepts using \`<blue>\`...\`</blue>\`.
+   - Highlight positive aspects or benefits using \`<green>\`...\`</green>\`.
+   - Highlight cautionary notes or potential issues using \`<orange>\`...\`</orange>\`.
+
+4. **Additional Instructions**:
+   - Ensure the summary is comprehensive but concise, capturing all essential information without unnecessary detail.
+   - Use colors sparingly and ONLY for their designated purposes.
+   - Adhere strictly to Markdown syntax for all formatting.
+   - Do not omit any important information from the transcript.
+   - Ensure that the summary accurately reflects the video's content.`;
 }
