@@ -12,28 +12,11 @@ document.getElementById('summariseBtn').addEventListener('click', () => {
       openSummaryWindow(currentTab.url);
       chrome.scripting.executeScript({
         target: { tabId: currentTab.id },
-        function: extractTextAndSummarise
+        files: ['contentScript.js']
       });
     }
   });
 });
-
-function extractTextAndSummarise() {
-  // Improved text extraction
-  let text = '';
-  const elements = document.body.querySelectorAll('*');
-
-  elements.forEach(element => {
-    const computedStyle = window.getComputedStyle(element);
-    if (computedStyle.display !== 'none' && computedStyle.visibility !== 'hidden') {
-      if (element.innerText) {
-        text += element.innerText + ' ';
-      }
-    }
-  });
-
-  chrome.runtime.sendMessage({ action: "summariseText", text: text.trim(), pageUrl: window.location.href, contentType: "text" });
-}
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "displaySummary") {
