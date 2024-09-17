@@ -65,7 +65,7 @@ def main():
     new_version = input(f"Enter the new version (default is {suggested_minor}): ").strip() or suggested_minor
 
     # Ask for the changes
-    changes = read_multiline_input('Enter the changes (plain text code changelog without empty lines or double spacing):')
+    changes = read_multiline_input('Enter the changes (CHANGELOG IN PLAIN TEXT CODE WITHOUT EMPTY LINES OR DOUBLE SPACING):')
 
     # Confirm and commit
     print(f"\nUploading version {new_version} with the following changes:\n{changes}")
