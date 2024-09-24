@@ -8,9 +8,7 @@
     "storage",
     "scripting",
     "contextMenus",
-    "tabs",
-    "webRequest",
-    "webRequestBlocking"
+    "tabs"
   ],
   "host_permissions": [
     "<all_urls>"

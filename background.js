@@ -20,7 +20,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         fetchAndSummariseLink(info.linkUrl);
       } else if (info.selectionText) {
         // Summarise the highlighted text
-        summariseText(info.selectionText, tab.url, "text");
+        summariseText(info.selectionText, tab.url, "text", tab.title, '');
       } else if (tab && tab.url && tab.url.includes('youtube.com/watch')) {
         // Extract YouTube transcript
         chrome.tabs.sendMessage(tab.id, { action: "extractTranscript" });
@@ -40,15 +40,15 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "summariseText") {
-    summariseText(request.text, request.pageUrl, request.contentType);
+    summariseText(request.text, request.pageUrl, request.contentType, request.pageTitle, request.publishedDate);
   } else if (request.action === "transcriptExtracted") {
-    summariseText(request.text, request.pageUrl, "youtube");
+    summariseText(request.text, request.pageUrl, "youtube", request.pageTitle, request.publishedDate);
   } else if (request.action === "displayError") {
     displayError(request.error, request.pageUrl);
   }
 });
 
-async function summariseText(text, pageUrl, contentType) {
+async function summariseText(text, pageUrl, contentType, pageTitle, publishedDate) {
   chrome.storage.sync.get(["apiKey", "youtubePrompt", "textPrompt", "model", "maxTokens", "temperature", "debug"], async (data) => {
     const apiKey = data.apiKey || "";
     const youtubePrompt = data.youtubePrompt || getDefaultYouTubePrompt();
@@ -82,6 +82,9 @@ async function summariseText(text, pageUrl, contentType) {
         }
       }
 
+      // Calculate word count
+      const wordCount = text.trim().split(/\s+/).length;
+
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -112,13 +115,17 @@ async function summariseText(text, pageUrl, contentType) {
       const summary = result.choices[0].message.content.trim();
 
       // Store summary and pageUrl in chrome.storage.local
-      chrome.storage.local.set({ latestSummary: summary, summaryPageUrl: pageUrl }, () => {
-        // Open summary.html in a new window
-        chrome.windows.create({
-          url: chrome.runtime.getURL('summary.html'),
-          type: 'popup',
-          width: 600,
-          height: 600
+      chrome.storage.local.set({
+        latestSummary: summary,
+        summaryPageUrl: pageUrl,
+        originalTextLength: text.length,
+        pageTitle: pageTitle,
+        publishedDate: publishedDate,
+        wordCount: wordCount
+      }, () => {
+        // Open summary.html in a new tab
+        chrome.tabs.create({
+          url: chrome.runtime.getURL('summary.html')
         });
       });
 
@@ -153,19 +160,37 @@ async function fetchAndSummariseLink(linkUrl) {
     // Remove HTML tags to get plain text
     const pageText = htmlText.replace(/<[^>]*>?/gm, ' ');
 
-    summariseText(pageText, linkUrl, "text");
+    // Extract title and published date if possible
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlText, 'text/html');
+    const title = doc.querySelector('title') ? doc.querySelector('title').innerText : linkUrl;
+    let publishedDate = '';
+
+    const metaTags = doc.getElementsByTagName('meta');
+    for (let meta of metaTags) {
+      if (
+        meta.getAttribute('property') === 'article:published_time' ||
+        meta.getAttribute('name') === 'pubdate' ||
+        meta.getAttribute('name') === 'publishdate' ||
+        meta.getAttribute('name') === 'date'
+      ) {
+        publishedDate = meta.getAttribute('content');
+        break;
+      }
+    }
+
+    summariseText(pageText, linkUrl, "text", title, publishedDate);
   } catch (error) {
     console.error('Error fetching link:', error);
     alert('Failed to fetch and summarise the link.');
   }
 }
 
-// Default prompts (same as before)
-
+// Default prompts (can be customized in options)
 function getDefaultYouTubePrompt() {
-  return `Summarise the following transcript from a YouTube video...`; // Your existing prompt
+  return `Summarise the following transcript from a YouTube video...`;
 }
 
 function getDefaultTextPrompt() {
-  return `Summarise the following text in a clear and concise manner...`; // Your existing prompt
+  return `Summarise the following text in a clear and concise manner...`;
 }

@@ -1,20 +1,25 @@
 // youtubeTranscript.js
 
-function extractYouTubeTranscript() {
-  const transcriptButton = document.querySelector('button[aria-label="Show transcript"]') ||
-                           document.querySelector('button[aria-label="Open transcript"]') ||
-                           document.querySelector('button.ytp-button[data-title-no-tooltip="Transcript"]') ||
-                           document.querySelector('tp-yt-paper-button.ytd-menu-renderer');
+function extractYouTubeData() {
+  const title = document.title.replace(' - YouTube', '').trim();
+  const publishedDateElement = document.querySelector('#info-strings yt-formatted-string');
+  const publishedDate = publishedDateElement ? publishedDateElement.innerText.trim() : '';
+
+  extractYouTubeTranscript(title, publishedDate);
+}
+
+function extractYouTubeTranscript(title, publishedDate) {
+  const transcriptButton = document.querySelector('button[aria-label="Show transcript"], button[aria-label="Open transcript"]');
 
   if (transcriptButton) {
     transcriptButton.click();
-    waitForTranscript();
+    waitForTranscript(title, publishedDate);
   } else {
     chrome.runtime.sendMessage({ action: "transcriptError", error: "Transcript button not found" });
   }
 }
 
-function waitForTranscript() {
+function waitForTranscript(title, publishedDate) {
   const maxWaitTime = 15000; // Maximum wait time in milliseconds
   const startTime = Date.now();
 
@@ -34,7 +39,13 @@ function waitForTranscript() {
         })
         .join('\n');
 
-      chrome.runtime.sendMessage({ action: "transcriptExtracted", text: transcript });
+      chrome.runtime.sendMessage({
+        action: "transcriptExtracted",
+        text: transcript,
+        pageUrl: window.location.href,
+        pageTitle: title,
+        publishedDate: publishedDate
+      });
     } else if (Date.now() - startTime < maxWaitTime) {
       setTimeout(checkTranscript, 500);
     } else {
@@ -47,6 +58,6 @@ function waitForTranscript() {
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "extractTranscript") {
-    extractYouTubeTranscript();
+    extractYouTubeData();
   }
 });

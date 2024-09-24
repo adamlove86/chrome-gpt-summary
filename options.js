@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
  });
  
  function getDefaultYouTubePrompt() {
-   return `Summarise the following transcript from a YouTube video. Present the summary as a detailed narrative, focusing on accurately capturing the key points and flow of the content. Follow these guidelines strictly:
+   return `Summarise the following transcript from a YouTube video. Present the summary as a detailed narrative, focusing on accurately capturing the key points and flow of the content. The summary should not exceed 500 words. Include section titles for each major point. Follow these guidelines strictly:
  
  1. **Overview Section**:
     - Begin with a brief summary paragraph covering the main points of the entire video.
@@ -36,19 +36,19 @@ document.addEventListener('DOMContentLoaded', () => {
     - Ensure the overview emphasises the main topic and key findings, avoiding excessive focus on background information.
  
  2. **Detailed Sections**:
-    - Break down the content into logical sections based on shifts in topics or themes.
+    - Limit the number of sections to no more than three key areas.
     - *Start each section with a heading in italic*, summarising that segment.
     - Use approximate time stamps for each section (e.g., \`0:00\`, \`1:30\`), if applicable.
-    - Ensure that the sections collectively cover the entire video content without omissions.
+    - Ensure that the sections collectively cover the most critical content without unnecessary detail.
     - Use complete sentences and maintain a clear, narrative flow.
  
  3. **Formatting Guidelines**:
     - Use **bold** to emphasise important terms, concepts, or breakthroughs.
     - Use *italic* to highlight supplementary or nuanced points.
-    - Highlight critical points or warnings using \`<red>\`...\`</red>\`.
-    - Highlight key definitions or important concepts using \`<blue>\`...\`</blue>\`.
-    - Highlight positive aspects or benefits using \`<green>\`...\`</green>\`.
-    - Highlight cautionary notes or potential issues using \`<orange>\`...\`</orange>\`.
+    - Highlight critical points or warnings using <red>...</red>.
+    - Highlight key definitions or important concepts using <blue>...</blue>.
+    - Highlight positive aspects or benefits using <green>...</green>.
+    - Highlight cautionary notes or potential issues using <orange>...</orange>.
  
  4. **Additional Instructions**:
     - Ensure the summary is comprehensive but concise, capturing all essential information without unnecessary detail.
@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
  }
  
  function getDefaultTextPrompt() {
-   return `Summarise the following text in a clear and concise manner. Present the summary as a detailed narrative, focusing on accurately capturing the key points and flow of the content. Follow these guidelines strictly:
+   return `Summarise the following text in a clear and concise manner, focusing on the most important points. The summary should not exceed 500 words. Include section titles for each major point. Present the summary as a detailed narrative with the following guidelines:
  
  1. **Overview Section**:
     - Begin with a brief summary paragraph covering the main points.
@@ -67,19 +67,18 @@ document.addEventListener('DOMContentLoaded', () => {
     - Ensure the overview emphasises the main topic and key findings, avoiding excessive focus on background information.
  
  2. **Detailed Sections**:
-    - Break down the content into logical sections based on shifts in topics or themes.
+    - Limit the number of sections to no more than three key areas.
     - *Present each section with a heading in italic*, summarising the key points.
     - Use headings without time stamps.
-    - Ensure that the sections collectively cover the entire content without omissions.
     - Use complete sentences and maintain a clear, narrative flow.
  
  3. **Formatting Guidelines**:
     - Use **bold** to emphasise important terms, concepts, or breakthroughs.
     - Use *italic* to highlight supplementary or nuanced points.
-    - Highlight critical points or warnings using \`<red>\`...\`</red>\`.
-    - Highlight key definitions or important concepts using \`<blue>\`...\`</blue>\`.
-    - Highlight positive aspects or benefits using \`<green>\`...\`</green>\`.
-    - Highlight cautionary notes or potential issues using \`<orange>\`...\`</orange>\`.
+    - Highlight critical points or warnings using <red>...</red>.
+    - Highlight key definitions or important concepts using <blue>...</blue>.
+    - Highlight positive aspects or benefits using <green>...</green>.
+    - Highlight cautionary notes or potential issues using <orange>...</orange>.
  
  4. **Additional Instructions**:
     - Ensure the summary is comprehensive but concise, capturing all essential information without unnecessary detail.
