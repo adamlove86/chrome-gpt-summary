@@ -28,62 +28,47 @@ document.addEventListener('DOMContentLoaded', () => {
  });
  
  function getDefaultYouTubePrompt() {
-   return `Summarise the following transcript from a YouTube video. Present the summary as a detailed narrative, focusing on accurately capturing the key points and flow of the content. The summary should not exceed 500 words. Include section titles for each major point. Follow these guidelines strictly:
+   return `Summarise the following transcript from a YouTube video. Present the summary in a clear and concise manner, adapting the length and detail according to the content. If the transcript is short, provide a single-paragraph summary. For longer transcripts where more detail is needed, follow these guidelines:
  
- 1. **Overview Section**:
-    - Begin with a brief summary paragraph covering the main points of the entire video.
-    - Use the format: \`0:00:00 - [Video Duration]\` at the beginning of this section.
-    - Ensure the overview emphasises the main topic and key findings, avoiding excessive focus on background information.
+ 1. **Overall Summary**:
+    - Begin with a brief paragraph summarising the main points of the entire video.
  
- 2. **Detailed Sections**:
-    - Limit the number of sections to no more than three key areas.
-    - *Start each section with a heading in italic*, summarising that segment.
-    - Use approximate time stamps for each section (e.g., \`0:00\`, \`1:30\`), if applicable.
-    - Ensure that the sections collectively cover the most critical content without unnecessary detail.
-    - Use complete sentences and maintain a clear, narrative flow.
+ 2. **Section Summaries**:
+    - If additional detail is necessary, break the summary into sections.
+    - Start each section with a heading that includes the timestamp (e.g., "*Introduction - 0:00*").
+    - The sections should be determined based on logical breaks in the content as deemed appropriate.
  
  3. **Formatting Guidelines**:
-    - Use **bold** to emphasise important terms, concepts, or breakthroughs.
-    - Use *italic* to highlight supplementary or nuanced points.
-    - Highlight critical points or warnings using <red>...</red>.
-    - Highlight key definitions or important concepts using <blue>...</blue>.
-    - Highlight positive aspects or benefits using <green>...</green>.
-    - Highlight cautionary notes or potential issues using <orange>...</orange>.
+    - Use **bold** for important terms or concepts.
+    - Use *italic* for headings and emphasis.
+    - Use appropriate Markdown syntax for formatting.
  
  4. **Additional Instructions**:
-    - Ensure the summary is comprehensive but concise, capturing all essential information without unnecessary detail.
-    - Use colours sparingly and ONLY for their designated purposes.
-    - Adhere strictly to Markdown syntax for all formatting.
+    - Decide whether to provide a single-paragraph summary or a multi-paragraph summary based on the length and complexity of the content.
+    - Ensure the summary accurately reflects the key points without unnecessary detail.
     - Do not omit any important information from the transcript.
     - Ensure that the summary reflects the video's actual content accurately.`;
  }
  
  function getDefaultTextPrompt() {
-   return `Summarise the following text in a clear and concise manner, focusing on the most important points. The summary should not exceed 500 words. Include section titles for each major point. Present the summary as a detailed narrative with the following guidelines:
+   return `Summarise the following text in a clear and concise manner, focusing on the most important points. Adapt the length and detail of the summary based on the length of the text. If the text is short, provide a single-paragraph summary. For longer texts where more detail is needed, follow these guidelines:
  
- 1. **Overview Section**:
-    - Begin with a brief summary paragraph covering the main points.
-    - Do not include time stamps.
-    - Ensure the overview emphasises the main topic and key findings, avoiding excessive focus on background information.
+ 1. **Overall Summary**:
+    - Begin with a brief paragraph summarising the main points of the entire text.
  
- 2. **Detailed Sections**:
-    - Limit the number of sections to no more than three key areas.
-    - *Present each section with a heading in italic*, summarising the key points.
-    - Use headings without time stamps.
-    - Use complete sentences and maintain a clear, narrative flow.
+ 2. **Section Summaries**:
+    - If additional detail is necessary, break the summary into sections.
+    - Start each section with a heading summarising that section.
+    - The sections should be determined based on logical breaks in the content as deemed appropriate.
  
  3. **Formatting Guidelines**:
-    - Use **bold** to emphasise important terms, concepts, or breakthroughs.
-    - Use *italic* to highlight supplementary or nuanced points.
-    - Highlight critical points or warnings using <red>...</red>.
-    - Highlight key definitions or important concepts using <blue>...</blue>.
-    - Highlight positive aspects or benefits using <green>...</green>.
-    - Highlight cautionary notes or potential issues using <orange>...</orange>.
+    - Use **bold** for important terms or concepts.
+    - Use *italic* for headings and emphasis.
+    - Use appropriate Markdown syntax for formatting.
  
  4. **Additional Instructions**:
-    - Ensure the summary is comprehensive but concise, capturing all essential information without unnecessary detail.
-    - Use colours sparingly and ONLY for their designated purposes.
-    - Adhere strictly to Markdown syntax for all formatting.
+    - Decide whether to provide a single-paragraph summary or a multi-paragraph summary based on the length and complexity of the content.
+    - Ensure the summary accurately reflects the key points without unnecessary detail.
     - Do not omit any important information from the text.
     - Ensure that the summary accurately reflects the content.`;
  }

@@ -14,7 +14,8 @@
       meta.getAttribute('property') === 'article:published_time' ||
       meta.getAttribute('name') === 'pubdate' ||
       meta.getAttribute('name') === 'publishdate' ||
-      meta.getAttribute('name') === 'date'
+      meta.getAttribute('name') === 'date' ||
+      meta.getAttribute('name') === 'DC.date.issued'
     ) {
       publishedDate = meta.getAttribute('content');
       break;

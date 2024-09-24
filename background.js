@@ -59,7 +59,17 @@ async function summariseText(text, pageUrl, contentType, pageTitle, publishedDat
     const debug = data.debug || false;
 
     // Choose the appropriate prompt
-    const prompt = contentType === 'youtube' ? youtubePrompt : textPrompt;
+    let prompt = contentType === 'youtube' ? youtubePrompt : textPrompt;
+
+    // Calculate word count based on whitespace splitting for a more accurate word count
+    const wordCount = text.trim().split(/\s+/).length;
+
+    // Adjust prompt based on word count
+    if (wordCount < 500) {
+      prompt += "\n\nPlease provide a concise, single-paragraph summary.";
+    } else {
+      prompt += "\n\nPlease provide a detailed summary following the guidelines.";
+    }
 
     if (debug) {
       console.log('Text Length:', text.length);
@@ -68,6 +78,7 @@ async function summariseText(text, pageUrl, contentType, pageTitle, publishedDat
       console.log('Model:', model);
       console.log('Max Tokens:', maxTokens);
       console.log('Temperature:', temperature);
+      console.log('Word Count:', wordCount);  // Added for better debugging
     }
 
     try {
@@ -81,9 +92,6 @@ async function summariseText(text, pageUrl, contentType, pageTitle, publishedDat
           console.log('Trimmed Text Length:', text.length);
         }
       }
-
-      // Calculate word count
-      const wordCount = text.trim().split(/\s+/).length;
 
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -118,10 +126,10 @@ async function summariseText(text, pageUrl, contentType, pageTitle, publishedDat
       chrome.storage.local.set({
         latestSummary: summary,
         summaryPageUrl: pageUrl,
-        originalTextLength: text.length,
+        originalTextLength: wordCount, // Store the actual word count
         pageTitle: pageTitle,
         publishedDate: publishedDate,
-        wordCount: wordCount
+        wordCount: wordCount  // Pass the correct word count to the summary display
       }, () => {
         // Open summary.html in a new tab
         chrome.tabs.create({
@@ -188,9 +196,51 @@ async function fetchAndSummariseLink(linkUrl) {
 
 // Default prompts (can be customized in options)
 function getDefaultYouTubePrompt() {
-  return `Summarise the following transcript from a YouTube video...`;
+  return `Summarise the following transcript from a YouTube video. Present the summary in a clear and concise manner, adapting the length and detail according to the content. If the transcript is short, provide a single-paragraph summary. For longer transcripts where more detail is needed, follow these guidelines:
+
+1. **Overall Summary**:
+   - Begin with a brief paragraph summarising the main points of the entire video.
+
+---
+
+2. **Section Summaries**:
+   - If additional detail is necessary, break the summary into sections.
+   - Start each section with a heading that includes the timestamp (e.g., "*Introduction - 0:00*").
+   - The sections should be determined based on logical breaks in the content as deemed appropriate.
+
+3. **Formatting Guidelines**:
+   - Use **bold** for important terms or concepts.
+   - Use *italic* for headings and emphasis.
+   - Use appropriate Markdown syntax for formatting.
+
+4. **Additional Instructions**:
+   - Decide whether to provide a single-paragraph summary or a multi-paragraph summary based on the length and complexity of the content.
+   - Ensure the summary accurately reflects the key points without unnecessary detail.
+   - Do not omit any important information from the transcript.
+   - Ensure that the summary reflects the video's actual content accurately.`;
 }
 
 function getDefaultTextPrompt() {
-  return `Summarise the following text in a clear and concise manner...`;
+  return `Summarise the following text in a clear and concise manner, focusing on the most important points. Adapt the length and detail of the summary based on the length of the text. If the text is short, provide a single-paragraph summary. For longer texts where more detail is needed, follow these guidelines:
+
+1. **Overall Summary**:
+   - Begin with a brief paragraph summarising the main points of the entire text.
+
+---
+
+2. **Section Summaries**:
+   - If additional detail is necessary, break the summary into sections.
+   - Start each section with a heading summarising that section.
+   - The sections should be determined based on logical breaks in the content as deemed appropriate.
+
+3. **Formatting Guidelines**:
+   - Use **bold** for important terms or concepts.
+   - Use *italic* for headings and emphasis.
+   - Use appropriate Markdown syntax for formatting.
+
+4. **Additional Instructions**:
+   - Decide whether to provide a single-paragraph summary or a multi-paragraph summary based on the length and complexity of the content.
+   - Ensure the summary accurately reflects the key points without unnecessary detail.
+   - Do not omit any important information from the text.
+   - Ensure that the summary accurately reflects the content.`;
 }
