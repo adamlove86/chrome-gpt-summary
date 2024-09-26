@@ -4,7 +4,9 @@ import subprocess
 def get_current_version():
     # Get the current version from git tags
     try:
-        current_version = subprocess.check_output(['git', 'describe', '--tags'], universal_newlines=True).strip().lstrip('v')
+        current_version = subprocess.check_output(['git', 'describe', '--tags'], universal_newlines=True).strip()
+        # Strip out any extra information after the version number (e.g., 'v1.4.1-1-gb92151c' -> '1.4.1')
+        current_version = current_version.split('-')[0].lstrip('v')
     except subprocess.CalledProcessError:
         current_version = "0.0.0"  # Default to 0.0.0 if no tag is found
     return current_version
