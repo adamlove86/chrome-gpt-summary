@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Summarise with GPT-4",
+  "name": "Summarise with GPT-4o-mini",
   "version": "1.4",
   "description": "Summarises text from web pages or YouTube transcripts using the ChatGPT API.",
   "permissions": [
@@ -22,21 +22,14 @@
     "48": "summarise.png"
   },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
       "js": ["contentScript.js"],
       "run_at": "document_end"
-    }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "prompts.js"
-      ],
-      "matches": ["<all_urls>"]
     }
   ]
 }

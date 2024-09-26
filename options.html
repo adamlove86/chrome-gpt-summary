@@ -1,42 +1,53 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>ChatGPT Summariser Settings</title>
-    <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        label { display: block; margin-top: 10px; }
-        input[type="text"], textarea { width: 100%; }
-        button { margin-top: 20px; }
-    </style>
-</head>
-<body>
-    <h1>ChatGPT Summariser Settings</h1>
-    <form id="settingsForm">
-        <label for="apiKey">API Key:</label>
-        <input type="text" id="apiKey" required>
+// prompt.js
 
-        <label for="model">Model (e.g., gpt-4, gpt-3.5-turbo):</label>
-        <input type="text" id="model" required>
+export function getDefaultYouTubePrompt() {
+  return `Summarise the following transcript from a YouTube video. Present the summary in a clear and concise manner, adapting the length and detail according to the content. If the transcript is short, provide a single-paragraph summary. For longer transcripts where more detail is needed, follow these guidelines:
 
-        <label for="maxTokens">Max Tokens:</label>
-        <input type="number" id="maxTokens" required>
+1. **Overall Summary**:
+   - Begin with a brief paragraph summarising the main points of the entire video.
 
-        <label for="temperature">Temperature:</label>
-        <input type="number" id="temperature" step="0.1" min="0" max="1" required>
+2. **Section Summaries**:
+   - If additional detail is necessary, break the summary into sections.
+   - Start each section with a heading that includes the timestamp (e.g., "*Introduction - 0:00*").
+   - The sections should be determined based on logical breaks in the content as deemed appropriate.
 
-        <label for="debug">
-            <input type="checkbox" id="debug">
-            Enable Debug Mode
-        </label>
+3. **Formatting Guidelines**:
+   - Use **bold** for important terms or concepts.
+   - Use *italic* for headings and emphasis.
+   - Use appropriate Markdown syntax for formatting.
 
-        <label for="youtubePrompt">YouTube Prompt:</label>
-        <textarea id="youtubePrompt" rows="10" required></textarea>
+4. **Additional Instructions**:
+   - Decide whether to provide a single-paragraph summary or a multi-paragraph summary based on the length and complexity of the content.
+   - Ensure the summary accurately reflects the key points without unnecessary detail.
+   - Do not omit any important information from the transcript.
+   - Ensure that the summary reflects the video's actual content accurately.
 
-        <label for="textPrompt">Text Prompt:</label>
-        <textarea id="textPrompt" rows="10" required></textarea>
+5. **Addressing the Video Title**:
+   - If the video's title contains sensational, provocative, or attention-grabbing elements, ensure that the summary explicitly addresses the issues or questions raised by the title.`;
+}
 
-        <button type="submit">Save Settings</button>
-    </form>
-    <script src="options.js"></script>
-</body>
-</html>
+export function getDefaultTextPrompt() {
+  return `Summarise the following text in a clear and concise manner, focusing on the most important points. Adapt the length and detail of the summary based on the length of the text. If the text is short, provide a single-paragraph summary. For longer texts where more detail is needed, follow these guidelines:
+
+1. **Overall Summary**:
+   - Begin with a brief paragraph summarising the main points of the entire text.
+
+2. **Section Summaries**:
+   - If additional detail is necessary, break the summary into sections.
+   - Start each section with a heading summarising that section.
+   - The sections should be determined based on logical breaks in the content as deemed appropriate.
+
+3. **Formatting Guidelines**:
+   - Use **bold** for important terms or concepts.
+   - Use *italic* for headings and emphasis.
+   - Use appropriate Markdown syntax for formatting.
+
+4. **Additional Instructions**:
+   - Decide whether to provide a single-paragraph summary or a multi-paragraph summary based on the length and complexity of the content.
+   - Ensure the summary accurately reflects the key points without unnecessary detail.
+   - Do not omit any important information from the text.
+   - Ensure that the summary accurately reflects the content.
+
+5. **Addressing the Title**:
+   - If the text's title contains sensational, provocative, or attention-grabbing elements, ensure that the summary explicitly addresses the issues or questions raised by the title.`;
+}

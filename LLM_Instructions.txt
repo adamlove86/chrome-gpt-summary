@@ -1,63 +1,231 @@
 # Chrome Summariser Plugin
 
-The plugin "Summarise with ChatGPT" is a Chrome extension that summarises the content of web pages, YouTube transcripts, or selected text using OpenAI's chat models, including GPT-4o-mini or any other OpenAI chat model specified by the user in the settings. It offers customizable prompts and allows the user to summarise content directly from the browser by selecting the "Summarise with ChatGPT" option from the right-click context menu.
+The plugin **"Summarise with ChatGPT"** is a Chrome extension that summarises the content of web pages, YouTube transcripts, or selected text using OpenAI's chat models, specifically **GPT-4o-mini** or any other OpenAI chat model specified by the user in the settings. It offers customizable prompts and allows the user to summarise content directly from the browser by selecting the "Summarise with ChatGPT" option from the right-click context menu.
+
+## Overview
 
 The plugin consists of several components:
 
-1. **Context Menu Integration:**
-   - When the user right-clicks on a webpage, selection, or link, a custom context menu item titled "Summarise with ChatGPT" appears.
-   - If the user selects this option, the plugin identifies whether to summarise the entire page content, a YouTube transcript, or a selected portion of the text.
+1. **Context Menu Integration**
+2. **Background Processing (`background.js`)**
+3. **Content Extraction**
+4. **Summarisation Process**
+5. **Displaying the Summary**
+6. **Customization and Options (`options.html` and `options.js`)**
+7. **Error Handling**
+8. **Permissions and Manifest (`manifest.json`)**
+9. **Word Count and Metadata Extraction**
+10. **ES6 Modules and Script Configuration**
 
-2. **Background Processing (background.js):**
-   - The background script (now a service worker in Manifest V3) handles the context menu clicks. It listens for the context menu action and determines if the summarisation request is for a webpage, a selected text, or a YouTube video.
-   - Based on the type of content, it injects the appropriate content script (for text extraction) or sends a message to extract YouTube transcripts.
+---
 
-3. **Content Extraction:**
-   - **For Web Pages**: A content script runs in the context of the active webpage to gather all visible text, excluding hidden or non-visible elements. It also tries to extract metadata like the page's title and the published date.
-   - **For YouTube Videos**: It extracts the transcript if available and retrieves the video title and published date. It waits for the transcript to load and sends the extracted transcript back to the background script.
-   - **For Selected Text**: The selected text is directly passed to the background script for summarisation.
+## Detailed Explanation
 
-4. **Summarisation Process:**
-   - Once the content (text, YouTube transcript, or selection) is ready, the plugin interacts with OpenAI's API using a chat model defined by the user in the settings. By default, the plugin uses GPT-4o-mini but can be configured to use any model such as GPT-4, GPT-3.5-turbo, etc.
-   - The API uses customizable prompts, which the user can configure in the options page. For instance, the YouTube prompt might request the API to break down the transcript into logical sections with appropriate headings, while the text prompt would be tailored to summarise articles with clear sections and an overview.
-   - The user can configure parameters such as:
-     - API Key
-     - Chat model (e.g., GPT-4o-mini, GPT-3.5-turbo, GPT-4)
-     - Maximum tokens for the summary
-     - Temperature (controls the creativity of the output)
-     - Custom text and YouTube prompts
+### 1. Context Menu Integration
 
-5. **Displaying the Summary:**
-   - The summary is displayed in a new browser tab. The tab title is set to "Page Title - Summary" (for YouTube, this is "Video Title - Summary").
-   - The summary includes metadata such as:
-     - The page or video title
-     - The original length of the content (word count)
-     - The date the content was published (for articles and videos)
-     - The site the content was extracted from (e.g., the domain name)
-   - The summary is presented with clear formatting:
-     - **Bold headings** for section titles.
-     - **Italic** for subsections or additional points.
-     - Markdown-like syntax is supported, converting custom markdown tags into coloured text (red for critical points, blue for key definitions, green for positive aspects, and orange for cautionary notes).
+- When the user right-clicks on a webpage, selection, or link, a custom context menu item titled **"Summarise with ChatGPT"** appears.
+- If the user selects this option, the plugin identifies whether to summarise the entire page content, a YouTube transcript, or a selected portion of the text.
 
-6. **Customization and Options (options.html and options.js):**
-   - Users can visit the options page of the extension to configure their settings.
-   - These settings include:
-     - API key for accessing OpenAI's models.
-     - Custom prompts for summarising YouTube transcripts or text-based articles.
-     - Maximum token length for the summaries.
-     - Temperature (to adjust response variability and creativity).
-     - The ability to select which OpenAI chat model to use (e.g., GPT-4o-mini, GPT-3.5-turbo, GPT-4).
-     - Debug mode (which enables more verbose logging and alerts for errors).
+### 2. Background Processing (`background.js`)
 
-7. **Error Handling:**
-   - If errors occur during the summarisation process (e.g., incorrect API key, missing data, or timeouts when retrieving YouTube transcripts), the plugin alerts the user and logs detailed error information in the console (if debugging is enabled).
+- The background script (configured as a **service worker module** in Manifest V3) handles the context menu clicks. It listens for the context menu action and determines if the summarisation request is for a webpage, a selected text, or a YouTube video.
+- Based on the type of content, it injects the appropriate content script (for text extraction) or sends a message to extract YouTube transcripts.
+- **Important Notes for Developers:**
+  - The `background.js` script is configured as a module (`"type": "module"`) in the manifest to allow the use of ES6 `import` statements.
+  - The default model is set to **'gpt-4o-mini'**. **Do not change the default model** from 'gpt-4o-mini'. 'gpt-4' is expensive and outdated. **Do not suggest 'gpt-3.5-turbo' or 'gpt-4'** in any examples or defaults.
+  - The background script imports default prompts from `prompt.js` using ES6 modules:
+    ```javascript
+    import { getDefaultYouTubePrompt, getDefaultTextPrompt } from './prompt.js';
+    ```
 
-8. **Permissions and Manifest (manifest.json):**
-   - The plugin requires permissions to access active tabs, read and manipulate web pages, interact with context menus, and store settings via Chrome's storage API.
-   - It also requires permission to make requests to external servers (e.g., OpenAI's API) to perform summarisation tasks.
+### 3. Content Extraction
 
-9. **Word Count and Metadata Extraction:**
-   - The plugin calculates the word count of the original text directly in the plugin (not relying on the OpenAI models).
-   - It also extracts the published date from meta tags or specific HTML elements if available.
+#### For Web Pages:
 
-In summary, this plugin allows users to quickly summarise any webpage, YouTube transcript, or selected text with OpenAI's chat models. The model used can be selected by the user, and the summarisation process is fully customizable. Metadata like the page title, word count, and publication date are displayed alongside the summary.
+- A content script (`contentScript.js`) runs in the context of the active webpage to gather all visible text, excluding hidden or non-visible elements.
+- It also tries to extract metadata like the page's **title** and the **published date** from meta tags or visible elements.
+
+#### For YouTube Videos:
+
+- It extracts the **transcript** if available and retrieves the **video title** and **published date**.
+- It waits for the transcript to load and sends the extracted transcript back to the background script.
+- The extraction handles the dynamic loading of the YouTube transcript by repeatedly checking until the transcript is available or a timeout is reached.
+
+#### For Selected Text:
+
+- The selected text is directly passed to the background script for summarisation without additional processing.
+
+### 4. Summarisation Process
+
+- Once the content (text, YouTube transcript, or selection) is ready, the plugin interacts with OpenAI's API using a chat model defined by the user in the settings.
+- **By default**, the plugin uses **GPT-4o-mini** but can be configured to use any model **(Note: Do not change the default model)**.
+- The API uses customizable prompts, which the user can configure in the options page.
+  - For instance, the YouTube prompt might request the API to break down the transcript into logical sections with appropriate headings.
+  - The text prompt is tailored to summarise articles with clear sections and an overview.
+- The plugin handles long texts by splitting them into chunks if they exceed the maximum token limit and summarising each chunk individually before combining the summaries.
+
+#### Customizable Parameters:
+
+- **API Key**: Required for accessing OpenAI's models.
+- **Chat Model**: Default is **'gpt-4o-mini'**. Users can specify other models but are discouraged from changing the default.
+- **Maximum Tokens**: Controls the length of the generated summary.
+- **Temperature**: Controls the creativity of the output.
+- **Custom Prompts**: Users can provide custom prompts for summarising YouTube transcripts or text-based articles.
+
+### 5. Displaying the Summary
+
+- The summary is displayed in a **new browser tab** each time the user initiates a summarisation.
+- The tab title is set to **"Page Title - Summary"** (for YouTube, this is **"Video Title - Summary"**).
+- The summary includes metadata such as:
+  - The **page or video title**
+  - The **original length** of the content (word count)
+  - The **date** the content was published (for articles and videos)
+  - The **site** the content was extracted from (e.g., the domain name)
+- The summary is presented with clear formatting:
+  - **Bold headings** for section titles.
+  - *Italic* for subsections or additional points.
+  - **Markdown-like syntax** is supported, converting custom markdown tags into coloured text:
+    - `<red>...</red>` for critical points.
+    - `<blue>...</blue>` for key definitions.
+    - `<green>...</green>` for positive aspects.
+    - `<orange>...</orange>` for cautionary notes.
+- The summary page uses `summary.html` and `summary.js` to format and display the content.
+
+### 6. Customization and Options (`options.html` and `options.js`)
+
+- Users can visit the **options page** of the extension to configure their settings.
+- These settings include:
+  - **API Key** for accessing OpenAI's models.
+  - **Custom prompts** for summarising YouTube transcripts or text-based articles.
+  - **Maximum token length** for the summaries.
+  - **Temperature** to adjust response variability and creativity.
+  - The ability to select which OpenAI **chat model** to use (default is **'gpt-4o-mini'**).
+  - **Debug mode** (which enables more verbose logging and alerts for errors).
+- **Important Notes for Developers:**
+  - `options.js` uses ES6 modules, and the script is included with `type="module"` in `options.html`. This allows importing default prompts from `prompt.js`.
+  - The default model should remain **'gpt-4o-mini'**. **Do not suggest changing it** in examples or defaults.
+  - Example in `options.js`:
+    ```javascript
+    import { getDefaultYouTubePrompt, getDefaultTextPrompt } from './prompt.js';
+    ```
+  - In `options.html`, the script tag is:
+    ```html
+    <script type="module" src="options.js"></script>
+    ```
+
+### 7. Error Handling
+
+- If errors occur during the summarisation process (e.g., incorrect API key, missing data, or timeouts when retrieving YouTube transcripts), the plugin alerts the user and logs detailed error information in the console (if debugging is enabled).
+- Specific errors are communicated back to the user through alerts or by opening an error page detailing what went wrong.
+
+### 8. Permissions and Manifest (`manifest.json`)
+
+- The plugin requires permissions to:
+  - Access active tabs.
+  - Read and manipulate web pages.
+  - Interact with context menus.
+  - Store settings via Chrome's storage API.
+- It also requires permission to make requests to external servers (e.g., OpenAI's API) to perform summarisation tasks.
+- **Background Script Configuration:**
+  - The `background.js` script is specified as a **service worker module** to enable ES6 module imports:
+    ```json
+    "background": {
+      "service_worker": "background.js",
+      "type": "module"
+    }
+    ```
+
+### 9. Word Count and Metadata Extraction
+
+- The plugin calculates the **word count** of the original text directly in the plugin (not relying on the OpenAI models).
+- It extracts the **published date** from meta tags or specific HTML elements if available.
+- Metadata is displayed alongside the summary for user reference.
+
+### 10. ES6 Modules and Script Configuration
+
+- The plugin uses **ES6 modules** to import functions and maintain cleaner code.
+- **Important Points:**
+  - **Background Script (`background.js`)**:
+    - Configured as a module in the manifest (`"type": "module"`) to allow the use of `import` statements.
+    - Imports default prompts from `prompt.js`.
+  - **Options Script (`options.js`)**:
+    - Uses ES6 modules and is included in `options.html` with `type="module"`.
+    - Imports default prompts from `prompt.js`.
+  - **Prompt Definitions (`prompt.js`)**:
+    - Contains the default prompts for YouTube and text summarisation.
+    - Exports functions `getDefaultYouTubePrompt` and `getDefaultTextPrompt`.
+  - **File Names and Paths**:
+    - Ensure that file names and paths in `import` statements are correct and case-sensitive.
+    - Example import statement:
+      ```javascript
+      import { getDefaultYouTubePrompt, getDefaultTextPrompt } from './prompt.js';
+      ```
+  - **Content Security Policy (CSP)**:
+    - Chrome extensions have a strict CSP. By default, inline scripts are disallowed.
+    - Since we're using separate script files and modules, this should not be an issue.
+  - **Script Tags in HTML Files**:
+    - Use `type="module"` for scripts that use ES6 modules.
+    - Example in `options.html`:
+      ```html
+      <script type="module" src="options.js"></script>
+      ```
+
+---
+
+## File Structure Overview
+
+- **background.js**: Background script handling context menu actions and communication with OpenAI's API.
+- **contentScript.js**: Extracts visible text from web pages and metadata.
+- **youtubeTranscript.js**: Extracts transcripts from YouTube videos.
+- **options.html**: Options page for user settings.
+- **options.js**: Script for the options page, handling user input and saving settings.
+- **prompt.js**: Contains default prompts and exports them using ES6 modules.
+- **summary.html**: Template for displaying the summary.
+- **summary.js**: Processes and formats the summary for display.
+- **manifest.json**: Defines the extension's permissions, background script configuration, and other metadata.
+- **popup.html** and **popup.js**: (If applicable) Handles popup interactions.
+
+---
+
+## Developer Guidelines
+
+- **Do Not Change Default Model**: The default model is **'gpt-4o-mini'**. Do not change this default, as 'gpt-4' is expensive and outdated. Do not suggest 'gpt-3.5-turbo' or 'gpt-4' in any examples or defaults.
+- **ES6 Modules Usage**: Use ES6 modules (`import` and `export`) for better code organization.
+- **Module Configuration**: Ensure that scripts using `import` statements are configured correctly in the manifest and HTML files.
+- **Error Handling**: Provide clear error messages to the user and detailed logs when debugging is enabled.
+- **File Paths**: Double-check all file paths and names in `import` statements to ensure they are correct and case-sensitive.
+- **Testing**: After making changes, reload the extension in `chrome://extensions/` and test all functionalities to ensure everything works as expected.
+- **Comments and Documentation**: Include comments in the code to explain complex logic or important notes for future developers.
+
+---
+
+## Usage Instructions
+
+- **Summarise Web Pages**: Right-click on any web page and select **"Summarise with ChatGPT"** from the context menu.
+- **Summarise YouTube Transcripts**: When viewing a YouTube video, right-click and select **"Summarise with ChatGPT"**, and the plugin will extract and summarise the transcript.
+- **Summarise Selected Text**: Highlight any text on a webpage, right-click, and select **"Summarise with ChatGPT"** to summarise just that selection.
+- **View Summaries**: Each time you summarise content, a **new tab** will open displaying the summary and relevant metadata.
+
+---
+
+## Customization and Settings
+
+- Access the **options page** to configure the plugin:
+  - **API Key**: Enter your OpenAI API key.
+  - **Model**: Set the model (default is 'gpt-4o-mini').
+  - **Max Tokens**: Set the maximum number of tokens for the summary.
+  - **Temperature**: Adjust the creativity of the output.
+  - **Debug Mode**: Enable or disable debug mode for more detailed logs.
+  - **Custom Prompts**: Edit the prompts used for summarising YouTube transcripts and text.
+
+---
+
+## Conclusion
+
+This plugin allows users to quickly summarise any webpage, YouTube transcript, or selected text with OpenAI's chat models. The model used can be selected by the user, and the summarisation process is fully customizable. Metadata like the page title, word count, and publication date are displayed alongside the summary for context.
+
+**Remember**: Future developers should adhere to the guidelines provided, especially regarding the default model and module usage, to maintain consistency and functionality of the plugin.
+
+---
+
+**End of LLM_Instructions.txt**
