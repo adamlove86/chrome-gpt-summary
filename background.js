@@ -1,7 +1,6 @@
 // background.js
 
-// Import the default prompts from prompts.js
-importScripts('prompts.js');
+import { getDefaultYouTubePrompt, getDefaultTextPrompt } from './prompt.js';
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
@@ -19,16 +18,12 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === "summarise") {
     try {
       if (info.linkUrl) {
-        // Summarise the content at the hyperlink
         fetchAndSummariseLink(info.linkUrl);
       } else if (info.selectionText) {
-        // Summarise the highlighted text
         summariseText(info.selectionText, tab.url, "text", tab.title, '');
       } else if (tab && tab.url && tab.url.includes('youtube.com/watch')) {
-        // Extract YouTube transcript
         chrome.tabs.sendMessage(tab.id, { action: "extractTranscript" });
       } else if (tab && tab.id) {
-        // Execute the content script to extract page text
         await chrome.scripting.executeScript({
           target: { tabId: tab.id },
           files: ['contentScript.js']
@@ -61,41 +56,16 @@ async function summariseText(text, pageUrl, contentType, pageTitle, publishedDat
     const temperature = data.temperature || 0.7;
     const debug = data.debug || false;
 
-    // Choose the appropriate prompt
     let prompt = contentType === 'youtube' ? youtubePrompt : textPrompt;
-
-    // Calculate word count based on whitespace splitting for a more accurate word count
     const wordCount = text.trim().split(/\s+/).length;
 
-    // Adjust prompt based on word count
     if (wordCount < 500) {
       prompt += "\n\nPlease provide a concise, single-paragraph summary.";
     } else {
       prompt += "\n\nPlease provide a detailed summary following the guidelines.";
     }
 
-    if (debug) {
-      console.log('Text Length:', text.length);
-      console.log('Text:', text);
-      console.log('Prompt:', prompt);
-      console.log('Model:', model);
-      console.log('Max Tokens:', maxTokens);
-      console.log('Temperature:', temperature);
-      console.log('Word Count:', wordCount);
-    }
-
     try {
-      // Estimate token count and trim text if necessary
-      const tokenEstimate = estimateTokens(text);
-      const maxInputTokens = 6000; // Adjust based on model's limit and maxTokens
-
-      if (tokenEstimate > maxInputTokens) {
-        text = text.substring(0, maxInputTokens * 4); // Trim text to fit within token limit
-        if (debug) {
-          console.log('Trimmed Text Length:', text.length);
-        }
-      }
-
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -115,17 +85,7 @@ async function summariseText(text, pageUrl, contentType, pageTitle, publishedDat
 
       const result = await response.json();
 
-      if (debug) {
-        console.log('API Response:', result);
-      }
-
-      if (result.error) {
-        throw new Error(result.error.message);
-      }
-
       const summary = result.choices[0].message.content.trim();
-
-      // Store summary and pageUrl in chrome.storage.local
       chrome.storage.local.set({
         latestSummary: summary,
         summaryPageUrl: pageUrl,
@@ -134,65 +94,12 @@ async function summariseText(text, pageUrl, contentType, pageTitle, publishedDat
         publishedDate: publishedDate,
         wordCount: wordCount
       }, () => {
-        // Open summary.html in a new tab
-        chrome.tabs.create({
-          url: chrome.runtime.getURL('summary.html')
-        });
+        chrome.tabs.create({ url: chrome.runtime.getURL('summary.html') });
       });
-
     } catch (error) {
       console.error("Error summarising text:", error);
-      if (debug) {
-        alert("Error: " + error.message);
-      } else {
-        alert("Failed to summarise the text. Please check your API key and settings.");
-      }
+      if (debug) alert("Error: " + error.message);
+      else alert("Failed to summarise the text. Please check your API key and settings.");
     }
   });
-}
-
-function estimateTokens(text) {
-  // Rough estimate: 1 token ≈ 4 characters
-  return Math.ceil(text.length / 4);
-}
-
-async function fetchAndSummariseLink(linkUrl) {
-  try {
-    const response = await fetch(linkUrl);
-
-    if (!response.ok) {
-      console.error('Network response was not ok', response.statusText);
-      alert('Failed to fetch and summarise the link.');
-      return;
-    }
-
-    const htmlText = await response.text();
-
-    // Remove HTML tags to get plain text
-    const pageText = htmlText.replace(/<[^>]*>?/gm, ' ');
-
-    // Extract title and published date if possible
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(htmlText, 'text/html');
-    const title = doc.querySelector('title') ? doc.querySelector('title').innerText : linkUrl;
-    let publishedDate = '';
-
-    const metaTags = doc.getElementsByTagName('meta');
-    for (let meta of metaTags) {
-      if (
-        meta.getAttribute('property') === 'article:published_time' ||
-        meta.getAttribute('name') === 'pubdate' ||
-        meta.getAttribute('name') === 'publishdate' ||
-        meta.getAttribute('name') === 'date'
-      ) {
-        publishedDate = meta.getAttribute('content');
-        break;
-      }
-    }
-
-    summariseText(pageText, linkUrl, "text", title, publishedDate);
-  } catch (error) {
-    console.error('Error fetching link:', error);
-    alert('Failed to fetch and summarise the link.');
-  }
 }

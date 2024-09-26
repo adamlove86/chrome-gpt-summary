@@ -1,7 +1,6 @@
 // options.js
 
-// Import the default prompts from prompts.js
-importScripts('prompts.js');
+import { getDefaultYouTubePrompt, getDefaultTextPrompt } from './prompt.js';
 
 document.addEventListener('DOMContentLoaded', () => {
    chrome.storage.sync.get(["apiKey", "youtubePrompt", "textPrompt", "model", "maxTokens", "temperature", "debug"], (data) => {
