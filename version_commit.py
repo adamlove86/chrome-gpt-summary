@@ -7,6 +7,9 @@ def get_current_version():
         current_version = subprocess.check_output(['git', 'describe', '--tags'], universal_newlines=True).strip().lstrip('v')
     except subprocess.CalledProcessError:
         current_version = "0.0.0"  # Default to 0.0.0 if no tag is found
+
+    # Remove any additional git metadata (e.g., '-1-gc57b4b4') after the version number
+    current_version = current_version.split('-')[0]
     return current_version
 
 def suggest_next_versions(current_version):
