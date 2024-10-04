@@ -1,15 +1,15 @@
 import os
 import subprocess
+import re
 
 def get_current_version():
     # Get the current version from git tags
     try:
-        current_version = subprocess.check_output(['git', 'describe', '--tags'], universal_newlines=True).strip().lstrip('v')
+        current_version = subprocess.check_output(['git', 'describe', '--tags'], universal_newlines=True).strip()
+        # Strip out any extra information after the version number (e.g., 'v1.4.1-1-gb92151c' -> '1.4.1')
+        current_version = current_version.split('-')[0].lstrip('v')
     except subprocess.CalledProcessError:
         current_version = "0.0.0"  # Default to 0.0.0 if no tag is found
-
-    # Remove any additional git metadata (e.g., '-1-gc57b4b4') after the version number
-    current_version = current_version.split('-')[0]
     return current_version
 
 def suggest_next_versions(current_version):
@@ -55,6 +55,23 @@ def commit_and_push(version, changes):
     subprocess.run(['git', 'push', 'origin', 'main'])
     subprocess.run(['git', 'push', 'origin', f'v{version}'])
 
+def get_new_version(suggested_versions):
+    while True:
+        new_version_input = input("Enter the new version (type 'a', 'b', 'c' to select suggested versions, or enter your own version number) (default is 'b'): ").strip() or 'b'
+        if new_version_input.lower() in ['a', 'b', 'c']:
+            if new_version_input.lower() == 'a':
+                return suggested_versions[0]
+            elif new_version_input.lower() == 'b':
+                return suggested_versions[1]
+            elif new_version_input.lower() == 'c':
+                return suggested_versions[2]
+        else:
+            # Validate the version format
+            if re.match(r'^\d+\.\d+\.\d+$', new_version_input):
+                return new_version_input
+            else:
+                print("Invalid version format. Please enter a version number like '1.5.0', or 'a', 'b', 'c' to select suggested versions.")
+
 def main():
     # Print the current version
     current_version = get_current_version()
@@ -62,10 +79,12 @@ def main():
 
     # Suggest next versions
     suggested_major, suggested_minor, suggested_patch = suggest_next_versions(current_version)
-    print(f"Suggested versions:\n  1. Major version: {suggested_major}\n  2. Minor version: {suggested_minor}\n  3. Patch version: {suggested_patch}")
+    print(f"Suggested versions:\n  a. Major version: {suggested_major}\n  b. Minor version: {suggested_minor}\n  c. Patch version: {suggested_patch}")
 
-    # Ask for the new version (use one of the suggestions or enter your own)
-    new_version = input(f"Enter the new version (default is {suggested_minor}): ").strip() or suggested_minor
+    suggested_versions = [suggested_major, suggested_minor, suggested_patch]
+
+    # Ask for the new version
+    new_version = get_new_version(suggested_versions)
 
     # Ask for the changes
     changes = read_multiline_input('Enter the changes (CHANGELOG IN PLAIN TEXT CODE WITHOUT EMPTY LINES OR DOUBLE SPACING):')
