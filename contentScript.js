@@ -3,7 +3,6 @@
 (function() {
   // Improved text extraction
   let text = '';
-  const elements = document.body.querySelectorAll('*');
   const title = document.title;
   let publishedDate = '';
 
@@ -30,18 +29,48 @@
     }
   }
 
-  elements.forEach(element => {
-    const computedStyle = window.getComputedStyle(element);
-    if (computedStyle.display !== 'none' && computedStyle.visibility !== 'hidden') {
-      if (element.innerText) {
-        text += element.innerText + ' ';
-      }
+  // Try to get the main content using common selectors
+  const selectors = [
+    'article',
+    'main',
+    '[role="main"]',
+    '.article__content',
+    '.article-content',
+    '.main-content',
+    '.entry-content',
+    '#content',
+    '.post-content'
+  ];
+
+  let contentElement = null;
+
+  for (let selector of selectors) {
+    contentElement = document.querySelector(selector);
+    if (contentElement) {
+      break;
     }
-  });
+  }
+
+  if (contentElement) {
+    text = contentElement.innerText.trim();
+  } else {
+    // Fallback to extracting all visible text
+    text = '';
+    const elements = document.body.querySelectorAll('*');
+    elements.forEach(element => {
+      const computedStyle = window.getComputedStyle(element);
+      if (computedStyle.display !== 'none' && computedStyle.visibility !== 'hidden') {
+        if (element.innerText) {
+          text += element.innerText + ' ';
+        }
+      }
+    });
+    text = text.trim();
+  }
 
   chrome.runtime.sendMessage({
     action: "summariseText",
-    text: text.trim(),
+    text: text,
     pageUrl: window.location.href,
     contentType: "text",
     pageTitle: title,
