@@ -28,7 +28,8 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "prompts.js"
+        "prompts.js",
+        "key.txt"
       ],
       "matches": ["<all_urls>"]
     }

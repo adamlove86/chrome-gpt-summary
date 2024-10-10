@@ -46,9 +46,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
+async function getApiKey() {
+  // First, try to fetch key.txt from the extension root folder
+  try {
+    const response = await fetch(chrome.runtime.getURL('key.txt'));
+    if (response.ok) {
+      const apiKeyFromFile = await response.text();
+      return apiKeyFromFile.trim(); // Remove any whitespace
+    }
+  } catch (e) {
+    // Ignore errors, proceed to get API key from storage
+  }
+
+  // If key.txt is not found or an error occurs, get the API key from storage
+  return new Promise((resolve, reject) => {
+    chrome.storage.sync.get(["apiKey"], (data) => {
+      const apiKey = data.apiKey || "";
+      resolve(apiKey);
+    });
+  });
+}
+
 async function summariseText(text, pageUrl, contentType, pageTitle, publishedDate) {
-  chrome.storage.sync.get(["apiKey", "youtubePrompt", "textPrompt", "model", "maxTokens", "temperature", "debug"], async (data) => {
-    const apiKey = data.apiKey || "";
+  chrome.storage.sync.get(["youtubePrompt", "textPrompt", "model", "maxTokens", "temperature", "debug"], async (data) => {
     const youtubePrompt = data.youtubePrompt || getDefaultYouTubePrompt();
     const textPrompt = data.textPrompt || getDefaultTextPrompt();
     const model = data.model || "gpt-4o-mini";
@@ -63,6 +83,14 @@ async function summariseText(text, pageUrl, contentType, pageTitle, publishedDat
       prompt += "\n\nPlease provide a concise, single-paragraph summary.";
     } else {
       prompt += "\n\nPlease provide a detailed summary following the guidelines.";
+    }
+
+    // Get the API key
+    const apiKey = await getApiKey();
+
+    if (!apiKey) {
+      alert("API key is missing. Please enter your API key in the options page.");
+      return;
     }
 
     try {
