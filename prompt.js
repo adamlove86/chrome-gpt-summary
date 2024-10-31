@@ -23,7 +23,7 @@ function getDefaultYouTubePrompt() {
     - Ensure that the summary reflects the video's actual content accurately.
  
  5. **Addressing the Video Title**:
-    - If the video's title contains sensational, provocative, or attention-grabbing elements, ensure that the summary explicitly addresses the issues or questions raised by the title.`;
+    - If the video's title contains sensational, provocative, or attention-grabbing elements, ensure that the summary explicitly addresses the issues or questions raised by the title in the first sentence of the overall summary.`;
  }
  
  function getDefaultTextPrompt() {
@@ -49,7 +49,7 @@ function getDefaultYouTubePrompt() {
     - Ensure that the summary accurately reflects the content.
  
  5. **Addressing the Text's Title**:
-    - If the text's title contains sensational, provocative, or attention-grabbing elements, ensure that the summary explicitly addresses the issues or questions raised by the title.`;
+    - If the text's title contains sensational, provocative, or attention-grabbing elements, ensure that the summary explicitly addresses the issues or questions raised by the title in the first sentence of the overall summary.`;
  }
  
  // Export functions to use in other files
