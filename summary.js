@@ -36,10 +36,17 @@ document.addEventListener('DOMContentLoaded', () => {
     pageUrlElement.textContent = pageUrl;
 
     // Store the summary text for TTS
-    window.summaryText = summary;
+    window.summaryText = stripMarkdown(summary);
 
     // Fetch available voices and populate the dropdown
     populateVoiceList();
+
+    // Set speech speed from storage
+    chrome.storage.sync.get(['speechSpeed'], (settings) => {
+      const speed = settings.speechSpeed || 100;
+      document.getElementById('speechSpeedSlider').value = speed;
+      document.getElementById('speechSpeedDisplay').textContent = `${speed}%`;
+    });
 
     // Add event listeners for play and stop buttons
     document.getElementById('playButton').addEventListener('click', () => {
@@ -48,6 +55,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('stopButton').addEventListener('click', () => {
       chrome.tts.stop();
+    });
+
+    // Update speech speed display when slider changes
+    document.getElementById('speechSpeedSlider').addEventListener('input', (e) => {
+      document.getElementById('speechSpeedDisplay').textContent = `${e.target.value}%`;
     });
   });
 });
@@ -114,24 +126,50 @@ function populateVoiceList() {
       option.textContent = `${voice.voiceName} (${voice.lang})`;
       select.appendChild(option);
     });
+
+    // Set default voice from storage
+    chrome.storage.sync.get(['defaultVoice'], (settings) => {
+      const defaultVoice = settings.defaultVoice || '';
+      if (defaultVoice) {
+        select.value = defaultVoice;
+      }
+    });
   });
 }
 
 function speakText(text) {
-  const voiceName = document.getElementById('voiceDropdown').value;
-  chrome.tts.speak(text, {
-    voiceName: voiceName,
-    rate: 1.0,
-    pitch: 1.0,
-    volume: 1.0,
-    onEvent: (event) => {
-      if (event.type === 'start') {
-        console.log('Speech started.');
-      } else if (event.type === 'end') {
-        console.log('Speech ended.');
-      } else if (event.type === 'error') {
-        console.error('Error: ' + event.errorMessage);
+  chrome.storage.sync.get(['defaultVoice', 'speechSpeed'], (settings) => {
+    const voiceName = settings.defaultVoice || '';
+    const speed = settings.speechSpeed ? settings.speechSpeed / 100 : 1.0;
+
+    chrome.tts.speak(text, {
+      voiceName: voiceName,
+      rate: speed,
+      pitch: 1.0,
+      volume: 1.0,
+      onEvent: (event) => {
+        if (event.type === 'start') {
+          console.log('Speech started.');
+        } else if (event.type === 'end') {
+          console.log('Speech ended.');
+        } else if (event.type === 'error') {
+          console.error('Error: ' + event.errorMessage);
+        }
       }
-    }
+    });
   });
+}
+
+function stripMarkdown(markdown) {
+  return markdown
+    .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold
+    .replace(/\*(.*?)\*/g, '$1')     // Remove italics
+    .replace(/<red>(.*?)<\/red>/g, '$1')
+    .replace(/<blue>(.*?)<\/blue>/g, '$1')
+    .replace(/<green>(.*?)<\/green>/g, '$1')
+    .replace(/<orange>(.*?)<\/orange>/g, '$1')
+    .replace(/### \*(.*)\*/g, '$1')
+    .replace(/## \*(.*)\*/g, '$1')
+    .replace(/# \*(.*)\*/g, '$1')
+    .replace(/<hr>/g, '\n---\n');
 }

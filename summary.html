@@ -48,8 +48,9 @@
       display: block;
       margin-bottom: 5px;
     }
-    #ttsControls select, #ttsControls button {
+    #ttsControls select, #ttsControls button, #ttsControls input[type="range"] {
       margin-right: 10px;
+      margin-bottom: 10px;
     }
   </style>
 </head>
@@ -62,6 +63,11 @@
   <div id="ttsControls">
     <label for="voiceDropdown">Choose Voice:</label>
     <select id="voiceDropdown"></select>
+
+    <label for="speechSpeedSlider">Speech Speed (%):</label>
+    <input type="range" id="speechSpeedSlider" min="50" max="150" value="100">
+    <span id="speechSpeedDisplay">100%</span>
+
     <button id="playButton">Play Summary</button>
     <button id="stopButton">Stop</button>
   </div>

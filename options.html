@@ -5,7 +5,7 @@
     <style>
         body { font-family: Arial, sans-serif; padding: 20px; }
         label { display: block; margin-top: 10px; }
-        input[type="text"], textarea { width: 100%; }
+        input[type="text"], textarea, select { width: 100%; }
         button { margin-top: 20px; }
     </style>
 </head>
@@ -34,6 +34,17 @@
 
         <label for="textPrompt">Text Prompt:</label>
         <textarea id="textPrompt" rows="10" required></textarea>
+
+        <hr>
+
+        <h2>Default Speech Settings</h2>
+
+        <label for="defaultVoice">Default Voice:</label>
+        <select id="defaultVoice"></select>
+
+        <label for="speechSpeed">Default Speech Speed (%):</label>
+        <input type="range" id="speechSpeed" min="50" max="150" value="100">
+        <span id="speechSpeedValue">100%</span>
 
         <button type="submit">Save Settings</button>
     </form>
