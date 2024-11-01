@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Summarise with GPT-4",
+  "name": "Summarise with GPT-4o-mini",
   "version": "1.4",
   "description": "Summarises text from web pages or YouTube transcripts using the ChatGPT API.",
   "permissions": [
@@ -8,7 +8,8 @@
     "storage",
     "scripting",
     "contextMenus",
-    "tabs"
+    "tabs",
+    "tts"
   ],
   "host_permissions": [
     "<all_urls>"

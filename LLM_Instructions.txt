@@ -1,6 +1,6 @@
 # Chrome Summariser Plugin
 
-The plugin "Summarise with ChatGPT" is a Chrome extension that summarises the content of web pages, YouTube transcripts, or selected text using OpenAI's chat models, including GPT-4o-mini or any other OpenAI chat model specified by the user in the settings. It offers customizable prompts and allows the user to summarise content directly from the browser by selecting the "Summarise with ChatGPT" option from the right-click context menu.
+The plugin "Summarise with ChatGPT" is a Chrome extension that summarises the content of web pages, YouTube transcripts, or selected text using OpenAI's chat models, including GPT-4o-mini or any other OpenAI chat model specified by the user in the settings. It offers customisable prompts and allows the user to summarise content directly from the browser by selecting the "Summarise with ChatGPT" option from the right-click context menu.
 
 The plugin consists of several components:
 
@@ -18,11 +18,11 @@ The plugin consists of several components:
    - **For Selected Text**: The selected text is directly passed to the background script for summarisation.
 
 4. **Summarisation Process:**
-   - Once the content (text, YouTube transcript, or selection) is ready, the plugin interacts with OpenAI's API using a chat model defined by the user in the settings. By default, the plugin uses GPT-4o-mini but can be configured to use any model such as GPT-4, GPT-3.5-turbo, etc.
-   - The API uses customizable prompts, which the user can configure in the options page. For instance, the YouTube prompt might request the API to break down the transcript into logical sections with appropriate headings, while the text prompt would be tailored to summarise articles with clear sections and an overview.
+   - Once the content (text, YouTube transcript, or selection) is ready, the plugin interacts with OpenAI's API using a chat model defined by the user in the settings. By default, the plugin uses GPT-4o-mini but can be configured to use any model such as GPT-3.5-turbo, etc.
+   - The API uses customisable prompts, which the user can configure in the options page. For instance, the YouTube prompt might request the API to break down the transcript into logical sections with appropriate headings, while the text prompt would be tailored to summarise articles with clear sections and an overview.
    - The user can configure parameters such as:
      - API Key
-     - Chat model (e.g., GPT-4o-mini, GPT-3.5-turbo, GPT-4)
+     - Chat model (e.g., GPT-4o-mini, GPT-3.5-turbo)
      - Maximum tokens for the summary
      - Temperature (controls the creativity of the output)
      - Custom text and YouTube prompts
@@ -39,14 +39,14 @@ The plugin consists of several components:
      - **Italic** for subsections or additional points.
      - Markdown-like syntax is supported, converting custom markdown tags into coloured text (red for critical points, blue for key definitions, green for positive aspects, and orange for cautionary notes).
 
-6. **Customization and Options (options.html and options.js):**
+6. **Customisation and Options (options.html and options.js):**
    - Users can visit the options page of the extension to configure their settings.
    - These settings include:
      - API key for accessing OpenAI's models.
      - Custom prompts for summarising YouTube transcripts or text-based articles.
      - Maximum token length for the summaries.
      - Temperature (to adjust response variability and creativity).
-     - The ability to select which OpenAI chat model to use (e.g., GPT-4o-mini, GPT-3.5-turbo, GPT-4).
+     - The ability to select which OpenAI chat model to use (e.g., GPT-4o-mini, GPT-3.5-turbo).
      - Debug mode (which enables more verbose logging and alerts for errors).
 
 7. **Error Handling:**
@@ -60,4 +60,4 @@ The plugin consists of several components:
    - The plugin calculates the word count of the original text directly in the plugin (not relying on the OpenAI models).
    - It also extracts the published date from meta tags or specific HTML elements if available.
 
-In summary, this plugin allows users to quickly summarise any webpage, YouTube transcript, or selected text with OpenAI's chat models. The model used can be selected by the user, and the summarisation process is fully customizable. Metadata like the page title, word count, and publication date are displayed alongside the summary.
+In summary, this plugin allows users to quickly summarise any webpage, YouTube transcript, or selected text with OpenAI's chat models. The model used can be selected by the user, and the summarisation process is fully customisable. Metadata like the page title, word count, and publication date are displayed alongside the summary.

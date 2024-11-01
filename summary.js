@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     summaryInfoElement.innerHTML = `
       <p><strong>Date Published:</strong> ${formattedPublishedDate}</p>
       <p><strong>Site:</strong> ${siteUrl}</p>
-      <p><strong>Original Length:</strong> ${wordCount} words</p>  <!-- Correct word count -->
+      <p><strong>Original Length:</strong> ${wordCount} words</p>
     `;
 
     // Convert markdown to HTML
@@ -34,6 +34,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const pageUrlElement = document.getElementById('pageUrl');
     pageUrlElement.href = pageUrl;
     pageUrlElement.textContent = pageUrl;
+
+    // Store the summary text for TTS
+    window.summaryText = summary;
+
+    // Fetch available voices and populate the dropdown
+    populateVoiceList();
+
+    // Add event listeners for play and stop buttons
+    document.getElementById('playButton').addEventListener('click', () => {
+      speakText(window.summaryText);
+    });
+
+    document.getElementById('stopButton').addEventListener('click', () => {
+      chrome.tts.stop();
+    });
   });
 });
 
@@ -44,15 +59,12 @@ function formatPublishedDate(publishedDate) {
 
   let dateObj = new Date(publishedDate);
   if (isNaN(dateObj.getTime())) {
-    // Try parsing with Date.parse
     dateObj = new Date(Date.parse(publishedDate));
   }
   if (isNaN(dateObj.getTime())) {
-    // Still invalid, return original string
     return publishedDate;
   }
 
-  // Format date as "6:15pm, Sat, 21 Sept 2024"
   const options = {
     hour: 'numeric',
     minute: 'numeric',
@@ -62,29 +74,24 @@ function formatPublishedDate(publishedDate) {
     month: 'short',
     year: 'numeric'
   };
-  return dateObj.toLocaleString('en-US', options);
+  return dateObj.toLocaleString('en-GB', options);
 }
 
 function convertMarkdownToHtml(markdown) {
-  // Convert headers with italic
   markdown = markdown.replace(/^### \*(.*)\*/gim, '<h3><em>$1</em></h3>');
   markdown = markdown.replace(/^## \*(.*)\*/gim, '<h2><strong>$1</strong></h2>');
   markdown = markdown.replace(/^# \*(.*)\*/gim, '<h1><strong>$1</strong></h1>');
 
-  // Convert bold and italic
   markdown = markdown.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
   markdown = markdown.replace(/\*(.*?)\*/g, '<em>$1</em>');
 
-  // Convert colour syntax
   markdown = markdown.replace(/<red>(.*?)<\/red>/g, '<span class="red">$1</span>');
   markdown = markdown.replace(/<blue>(.*?)<\/blue>/g, '<span class="blue">$1</span>');
   markdown = markdown.replace(/<green>(.*?)<\/green>/g, '<span class="green">$1</span>');
   markdown = markdown.replace(/<orange>(.*?)<\/orange>/g, '<span class="orange">$1</span>');
 
-  // Add "---" for separation in articles
   markdown = markdown.replace(/\n---\n/g, '<hr>');
 
-  // Convert paragraphs and headings
   const lines = markdown.split('\n');
   let html = '';
   lines.forEach(line => {
@@ -96,4 +103,35 @@ function convertMarkdownToHtml(markdown) {
   });
 
   return html.trim();
+}
+
+function populateVoiceList() {
+  const select = document.getElementById('voiceDropdown');
+  chrome.tts.getVoices((voices) => {
+    voices.forEach((voice) => {
+      const option = document.createElement('option');
+      option.value = voice.voiceName;
+      option.textContent = `${voice.voiceName} (${voice.lang})`;
+      select.appendChild(option);
+    });
+  });
+}
+
+function speakText(text) {
+  const voiceName = document.getElementById('voiceDropdown').value;
+  chrome.tts.speak(text, {
+    voiceName: voiceName,
+    rate: 1.0,
+    pitch: 1.0,
+    volume: 1.0,
+    onEvent: (event) => {
+      if (event.type === 'start') {
+        console.log('Speech started.');
+      } else if (event.type === 'end') {
+        console.log('Speech ended.');
+      } else if (event.type === 'error') {
+        console.error('Error: ' + event.errorMessage);
+      }
+    }
+  });
 }

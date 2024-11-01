@@ -7,7 +7,7 @@
       font-family: Arial, sans-serif;
       line-height: 1.6;
       padding: 20px;
-      max-width: 800px; /* Half the screen width for better readability */
+      max-width: 800px;
       margin: auto;
     }
     h1 {
@@ -40,12 +40,32 @@
       color: #3498db;
       text-decoration: none;
     }
+    /* Additional styles for TTS controls */
+    #ttsControls {
+      margin-top: 20px;
+    }
+    #ttsControls label {
+      display: block;
+      margin-bottom: 5px;
+    }
+    #ttsControls select, #ttsControls button {
+      margin-right: 10px;
+    }
   </style>
 </head>
 <body>
   <h1 id="summaryTitle"></h1>
   <div id="summaryInfo"></div>
   <div id="summaryContent">Loading summary...</div>
+
+  <!-- TTS Controls -->
+  <div id="ttsControls">
+    <label for="voiceDropdown">Choose Voice:</label>
+    <select id="voiceDropdown"></select>
+    <button id="playButton">Play Summary</button>
+    <button id="stopButton">Stop</button>
+  </div>
+
   <div class="footer">
     <p>Original page: <a id="pageUrl" href="#" target="_blank"></a></p>
   </div>
