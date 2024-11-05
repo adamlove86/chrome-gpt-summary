@@ -31,6 +31,7 @@ A Chrome extension that summarises web pages and YouTube transcripts using GPT-4
 ### Usage
 - Summarise Web Pages: Right-click on any web page and select "Summarise with ChatGPT" from the context menu.
 - Summarise YouTube Transcripts: When viewing a YouTube video, the plugin will automatically extract the transcript and provide a summary.
+- Summarise Selected Text: Highlight any text on a web page, right-click, and select "Summarise with ChatGPT" to summarise just the selected portion.
 
 ### Licence
 This project is licensed under the GNU General Public Licence v3.0 (GPL-3.0). You may use, distribute, and modify this code under the terms of the GPL-3.0. Commercial use of this software is not permitted without explicit permission from the author. For more details, see the LICENCE file.

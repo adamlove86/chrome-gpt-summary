@@ -30,7 +30,8 @@
     {
       "resources": [
         "prompts.js",
-        "key.txt"
+        "key.txt",
+        "displaySummary.js"
       ],
       "matches": ["<all_urls>"]
     }

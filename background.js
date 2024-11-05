@@ -19,14 +19,26 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     try {
       if (info.linkUrl) {
         fetchAndSummariseLink(info.linkUrl);
-      } else if (info.selectionText) {
-        summariseText(info.selectionText, tab.url, "text", tab.title, '');
+      } else if (info.selectionText && info.selectionText.trim() !== '') {
+        summariseText(info.selectionText, tab.url, "text", tab.title, '', tab.id);
       } else if (tab && tab.url && tab.url.includes('youtube.com/watch')) {
         chrome.tabs.sendMessage(tab.id, { action: "extractTranscript" });
       } else if (tab && tab.id) {
-        await chrome.scripting.executeScript({
+        // Attempt to get the selected text via content script
+        chrome.scripting.executeScript({
           target: { tabId: tab.id },
-          files: ['contentScript.js']
+          function: () => window.getSelection().toString()
+        }, (injectionResults) => {
+          const selectedText = injectionResults[0].result;
+          if (selectedText && selectedText.trim() !== '') {
+            summariseText(selectedText, tab.url, "text", tab.title, '', tab.id);
+          } else {
+            // Inject content script to extract page content
+            chrome.scripting.executeScript({
+              target: { tabId: tab.id },
+              files: ['contentScript.js']
+            });
+          }
         });
       }
     } catch (error) {
@@ -38,9 +50,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "summariseText") {
-    summariseText(request.text, request.pageUrl, request.contentType, request.pageTitle, request.publishedDate);
+    summariseText(request.text, request.pageUrl, request.contentType, request.pageTitle, request.publishedDate, sender.tab.id);
   } else if (request.action === "transcriptExtracted") {
-    summariseText(request.text, request.pageUrl, "youtube", request.pageTitle, request.publishedDate);
+    summariseText(request.text, request.pageUrl, "youtube", request.pageTitle, request.publishedDate, sender.tab.id);
   } else if (request.action === "displayError") {
     displayError(request.error, request.pageUrl);
   }
@@ -67,7 +79,7 @@ async function getApiKey() {
   });
 }
 
-async function summariseText(text, pageUrl, contentType, pageTitle, publishedDate) {
+async function summariseText(text, pageUrl, contentType, pageTitle, publishedDate, tabId) {
   chrome.storage.sync.get(["youtubePrompt", "textPrompt", "model", "maxTokens", "temperature", "debug"], async (data) => {
     const youtubePrompt = data.youtubePrompt || getDefaultYouTubePrompt();
     const textPrompt = data.textPrompt || getDefaultTextPrompt();
@@ -122,12 +134,30 @@ async function summariseText(text, pageUrl, contentType, pageTitle, publishedDat
         publishedDate: publishedDate,
         wordCount: wordCount
       }, () => {
-        chrome.tabs.create({ url: chrome.runtime.getURL('summary.html') });
+        // Inject content script to display the summary in a sidebar
+        chrome.scripting.executeScript({
+          target: { tabId: tabId },
+          files: ['displaySummary.js']
+        });
       });
     } catch (error) {
       console.error("Error summarising text:", error);
       if (debug) alert("Error: " + error.message);
       else alert("Failed to summarise the text. Please check your API key and settings.");
     }
+  });
+}
+
+function fetchAndSummariseLink(linkUrl) {
+  // Implement link summarisation if needed
+  // For now, you can alert the user or handle it similarly to summarising text
+  alert("Summarising links is not yet implemented.");
+}
+
+function displayError(errorMessage, pageUrl) {
+  // Inject content script to display the error in a sidebar
+  chrome.scripting.executeScript({
+    target: { tabId: sender.tab.id },
+    files: ['displayError.js']
   });
 }
