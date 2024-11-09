@@ -86,10 +86,19 @@ async function summariseText(text, pageUrl, contentType, pageTitle, publishedDat
     let prompt = contentType === 'youtube' ? youtubePrompt : textPrompt;
     const wordCount = text.trim().split(/\s+/).length;
 
-    if (wordCount < 500) {
-      prompt += "\n\nPlease provide a concise, single-paragraph summary.";
+    // Adjust word count threshold for YouTube
+    if (contentType === 'youtube') {
+      if (wordCount < 1000) { // Increased threshold for YouTube
+        prompt += "\n\nPlease provide a detailed summary following the guidelines.";
+      } else {
+        prompt += "\n\nPlease provide a detailed summary following the guidelines.";
+      }
     } else {
-      prompt += "\n\nPlease provide a detailed summary following the guidelines.";
+      if (wordCount < 500) {
+        prompt += "\n\nPlease provide a concise, single-paragraph summary.";
+      } else {
+        prompt += "\n\nPlease provide a detailed summary following the guidelines.";
+      }
     }
 
     // Get the API key
