@@ -22,27 +22,22 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       } else if (info.selectionText && info.selectionText.trim() !== '') {
         summariseText(info.selectionText, tab.url, "text", tab.title, '', tab.id);
       } else if (tab && tab.url && tab.url.includes('youtube.com/watch')) {
+        // Inject JSDOMParser.js, Readability.js, then youtubeTranscript.js
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['JSDOMParser.js', 'Readability.js', 'youtubeTranscript.js']
+        });
+        // Send a message to start transcript extraction
         chrome.tabs.sendMessage(tab.id, { action: "extractTranscript" });
       } else if (tab && tab.id) {
-        // Attempt to get the selected text via content script
-        chrome.scripting.executeScript({
+        // Inject JSDOMParser.js, Readability.js, then contentScript.js
+        await chrome.scripting.executeScript({
           target: { tabId: tab.id },
-          function: () => window.getSelection().toString()
-        }, (injectionResults) => {
-          const selectedText = injectionResults[0].result;
-          if (selectedText && selectedText.trim() !== '') {
-            summariseText(selectedText, tab.url, "text", tab.title, '', tab.id);
-          } else {
-            // Inject content script to extract page content
-            chrome.scripting.executeScript({
-              target: { tabId: tab.id },
-              files: ['contentScript.js']
-            });
-          }
+          files: ['JSDOMParser.js', 'Readability.js', 'contentScript.js']
         });
       }
     } catch (error) {
-      console.error('Error executing script:', error);
+      console.error('Error executing scripts:', error);
       chrome.tabs.sendMessage(tab.id, { action: "displayError", error: error.message });
     }
   }
@@ -125,21 +120,25 @@ async function summariseText(text, pageUrl, contentType, pageTitle, publishedDat
 
       const result = await response.json();
 
-      const summary = result.choices[0].message.content.trim();
-      chrome.storage.local.set({
-        latestSummary: summary,
-        summaryPageUrl: pageUrl,
-        originalTextLength: wordCount,
-        pageTitle: pageTitle,
-        publishedDate: publishedDate,
-        wordCount: wordCount
-      }, () => {
-        // Inject content script to display the summary in a sidebar
-        chrome.scripting.executeScript({
-          target: { tabId: tabId },
-          files: ['displaySummary.js']
+      if (result.choices && result.choices.length > 0) {
+        const summary = result.choices[0].message.content.trim();
+        chrome.storage.local.set({
+          latestSummary: summary,
+          summaryPageUrl: pageUrl,
+          originalTextLength: wordCount,
+          pageTitle: pageTitle,
+          publishedDate: publishedDate,
+          wordCount: wordCount
+        }, () => {
+          // Inject content script to display the summary in a sidebar
+          chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            files: ['displaySummary.js']
+          });
         });
-      });
+      } else {
+        throw new Error("No summary received from API.");
+      }
     } catch (error) {
       console.error("Error summarising text:", error);
       if (debug) alert("Error: " + error.message);

@@ -29,9 +29,12 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "prompts.js",
+        "Readability.js",
+        "JSDOMParser.js",
+        "prompt.js",
         "key.txt",
-        "displaySummary.js"
+        "displaySummary.js",
+        "youtubeTranscript.js"
       ],
       "matches": ["<all_urls>"]
     }
