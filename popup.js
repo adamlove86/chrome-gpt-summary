@@ -1,5 +1,4 @@
 // popup.js
-
 import { getDefaultYouTubePrompt, getDefaultTextPrompt } from './prompt.js';
 
 document.getElementById('summariseBtn').addEventListener('click', async () => {
@@ -14,8 +13,7 @@ document.getElementById('summariseBtn').addEventListener('click', async () => {
         // Send a message to start transcript extraction
         chrome.tabs.sendMessage(currentTab.id, { action: "extractTranscript" });
       } catch (error) {
-        console.error('Error injecting scripts:', error);
-        alert("Failed to inject scripts.");
+        console.error("Error injecting scripts:", error);
       }
     } else if (currentTab && currentTab.id) {
       try {
@@ -24,9 +22,18 @@ document.getElementById('summariseBtn').addEventListener('click', async () => {
           files: ['JSDOMParser.js', 'Readability.js', 'contentScript.js']
         });
       } catch (error) {
-        console.error('Error injecting scripts:', error);
-        alert("Failed to inject scripts.");
+        console.error("Error injecting scripts:", error);
       }
+    }
+  });
+});
+
+document.getElementById('downloadLogBtn').addEventListener('click', () => {
+  chrome.runtime.sendMessage({ action: "downloadLog" }, (response) => {
+    if (response.status === "done") {
+      console.log("Log file download initiated.");
+    } else {
+      console.error("Error downloading log file: " + response.message);
     }
   });
 });
@@ -37,26 +44,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.action === "transcriptExtracted") {
     summariseText(request.text, request.pageUrl, "youtube", request.pageTitle, request.publishedDate, sender.tab.id);
   } else if (request.action === "transcriptError") {
-    alert("Error extracting YouTube transcript: " + request.error);
+    console.error("Error extracting YouTube transcript: " + request.error);
   } else if (request.action === "displayError") {
     displayError(request.error, request.pageUrl);
   }
 });
 
 async function getApiKey() {
-  // First, try to fetch key.txt from the extension root folder
   try {
     const response = await fetch(chrome.runtime.getURL('key.txt'));
     if (response.ok) {
       const apiKeyFromFile = await response.text();
-      return apiKeyFromFile.trim(); // Remove any whitespace
+      return apiKeyFromFile.trim();
     }
   } catch (e) {
-    // Ignore errors, proceed to get API key from storage
+    // Fallback to storage
   }
-
-  // If key.txt is not found or an error occurs, get the API key from storage
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     chrome.storage.sync.get(["apiKey"], (data) => {
       const apiKey = data.apiKey || "";
       resolve(apiKey);
@@ -76,17 +80,13 @@ async function summariseText(text, pageUrl, contentType, pageTitle, publishedDat
     let prompt = contentType === 'youtube' ? youtubePrompt : textPrompt;
     const wordCount = text.trim().split(/\s+/).length;
 
-    if (wordCount < 500) {
-      prompt += "\n\nPlease provide a concise, single-paragraph summary.";
-    } else {
-      prompt += "\n\nPlease provide a detailed summary following the guidelines.";
-    }
+    prompt += wordCount < 500
+      ? "\n\nPlease provide a concise, single-paragraph summary."
+      : "\n\nPlease provide a detailed summary following the guidelines.";
 
-    // Get the API key
     const apiKey = await getApiKey();
-
     if (!apiKey) {
-      alert("API key is missing. Please enter your API key in the options page.");
+      console.error("API key is missing. Please enter your API key in the options page.");
       return;
     }
 
@@ -120,7 +120,6 @@ async function summariseText(text, pageUrl, contentType, pageTitle, publishedDat
           publishedDate: publishedDate,
           wordCount: wordCount
         }, () => {
-          // Inject content script to display the summary in a sidebar
           chrome.scripting.executeScript({
             target: { tabId: tabId },
             files: ['displaySummary.js']
@@ -131,16 +130,12 @@ async function summariseText(text, pageUrl, contentType, pageTitle, publishedDat
       }
     } catch (error) {
       console.error("Error summarising text:", error);
-      if (debug) alert("Error: " + error.message);
-      else alert("Failed to summarise the text. Please check your API key and settings.");
+      if (debug) console.error("Error: " + error.message);
+      else console.error("Failed to summarise the text. Please check your API key and settings.");
     }
   });
 }
 
 function displayError(errorMessage, pageUrl) {
-  // Inject content script to display the error in a sidebar
-  chrome.scripting.executeScript({
-    target: { tabId: sender.tab.id },
-    files: ['displayError.js']
-  });
+  console.error("Error: " + errorMessage);
 }

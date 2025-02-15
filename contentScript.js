@@ -15,6 +15,9 @@
       const title = article.title || document.title;
       let publishedDate = '';
 
+      // Log the extraction length
+      chrome.runtime.sendMessage({ action: "log", message: "Content extracted: " + text.length + " characters." });
+
       // Try to extract the published date from meta tags
       const metaTags = document.getElementsByTagName('meta');
       for (let meta of metaTags) {
