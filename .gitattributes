@@ -1,0 +1,16 @@
+# Set default behavior, in case users don't have core.autocrlf set.
+* text=auto
+
+# Declare files that will always have LF line endings in the repo
+*.js    text eol=lf
+*.css   text eol=lf
+*.html  text eol=lf
+*.json  text eol=lf
+# Add other text file types as needed
+
+# Declare files that will always have CRLF line endings in the repo
+# *.bat   text eol=crlf
+
+# Declare files that should not be touched (binary files)
+# *.png   binary
+# *.jpg   binary
