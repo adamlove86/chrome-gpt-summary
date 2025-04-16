@@ -12,7 +12,13 @@
     try {
       requestAnimationFrame(() => {
         if (chrome && chrome.runtime && chrome.runtime.sendMessage) {
-            chrome.runtime.sendMessage({ action: "log", message: "displaySummary.js: " + message });
+            chrome.runtime.sendMessage({ action: "log", message: "displaySummary.js: " + message }, () => {
+                 // Add a check for lastError in the callback
+                 if (chrome.runtime.lastError) {
+                     // console.log(`logEvent failed: ${chrome.runtime.lastError.message}. Original message: ${message}`);
+                     // Context was invalidated, do nothing further
+                 }
+            });
         } else {
             // console.log("displaySummary.js (fallback): " + message);
         }
@@ -52,6 +58,7 @@
   let stopRequested = false; // Flag to differentiate manual stop from premature end
   let prematureStopRetryCount = 0; // Counter for retries on premature stops
   const MAX_PREMATURE_STOP_RETRIES = 3; // Max retries per chunk
+  let cancelInProgress = false; // Flag to prevent speaking while cancel() is processing
 
   // --- Initial Setup ---
   cleanupExistingSidebar();
@@ -534,7 +541,14 @@
   }
 
   function speakChunk() {
-    logEvent(`speakChunk: Index=${currentChunkIndex}, Chunks=${currentChunks.length}, Paused=${isPaused}, SpeakingPending=${isSpeakingOrPending}, StopReq=${stopRequested}`);
+    logEvent(`speakChunk: Index=${currentChunkIndex}, Chunks=${currentChunks.length}, Paused=${isPaused}, SpeakingPending=${isSpeakingOrPending}, StopReq=${stopRequested}, CancelInProgress=${cancelInProgress}`);
+
+    // *** Prevent speaking if a cancel operation is still potentially processing ***
+    if (cancelInProgress) {
+        logEvent("speakChunk: Bailed out - cancel operation likely in progress.");
+        return;
+    }
+
     if (stopRequested || currentChunkIndex >= currentChunks.length) {
       logEvent("speakChunk: Stop requested or all chunks processed.");
       resetTTSState(); return;
@@ -561,16 +575,16 @@
     prematureStopRetryCount = 0; // Reset retry count for the new utterance
 
     // Voice selection (existing logic)
-    try {
-      availableVoices = speechSynthesis.getVoices();
-    } catch (e) {
+    try { 
+      availableVoices = speechSynthesis.getVoices(); 
+    } catch (e) { 
       logEvent("Error refreshing voices: " + e.message);
-      availableVoices = [];
+      availableVoices = []; 
     }
     const chosenVoiceName = voiceDropdown ? voiceDropdown.value : null;
     const selectedVoice = chosenVoiceName ? availableVoices.find(v => v.name === chosenVoiceName) : null;
-    if (selectedVoice) {
-      utterance.voice = selectedVoice;
+    if (selectedVoice) { 
+      utterance.voice = selectedVoice; 
       logEvent(`Using voice: ${selectedVoice.name} (Local: ${selectedVoice.localService})`);
     } else {
       logEvent(`Voice "${chosenVoiceName || 'none'}" invalid or not found, using default.`);
@@ -579,13 +593,13 @@
        if (defaultEngVoice) {
            utterance.voice = defaultEngVoice;
            logEvent(`Falling back to default English voice: ${defaultEngVoice.name}`);
-       } else {
+    } else { 
            // Let the browser pick its absolute default
            logEvent("No specific default English voice found, using browser default.");
        }
     }
     utterance.rate = speedSlider ? (parseFloat(speedSlider.value) / 100) : 1.0;
-    utterance.pitch = 1.0;
+    utterance.pitch = 1.0; 
     utterance.volume = 1.0;
 
     // --- Event Handlers ---
@@ -611,16 +625,17 @@
 
       // Don't reset state or alert if it was a manual cancellation
       if (errorType !== 'canceled' || !stopRequested) {
-          resetTTSState();
+      resetTTSState(); 
           if (userMessage) alert(userMessage);
       } else {
           logEvent("Error was 'canceled' likely due to manual stop/pause, suppressing alert.");
+          cancelInProgress = false; // Cancellation seems complete
           resetTTSState(); // Still reset state cleanly
       }
     };
 
     utterance.onend = () => {
-      logEvent(`Chunk ${currentChunkIndex + 1} ended. StopReq=${stopRequested}, Paused=${isPaused}, SpeakingPending=${isSpeakingOrPending}, FinalChunk=${currentChunkIndex >= currentChunks.length - 1}`);
+      logEvent(`Chunk ${currentChunkIndex + 1} ended. StopReq=${stopRequested}, Paused=${isPaused}, SpeakingPending=${isSpeakingOrPending}, FinalChunk=${currentChunkIndex >= currentChunks.length - 1}, CancelInProgress=${cancelInProgress}`);
 
       utterance = null; // Clear current utterance reference
 
@@ -633,6 +648,7 @@
       // --- Premature Stop / Next Chunk Logic ---
       if (stopRequested) {
           logEvent("onend: Stop was requested, resetting state.");
+          cancelInProgress = false; // Cancellation seems complete
           resetTTSState();
           return;
       }
@@ -644,26 +660,26 @@
       }
 
       if (isSpeakingOrPending) {
-          if (currentChunkIndex < currentChunks.length - 1) {
+        if (currentChunkIndex < currentChunks.length - 1) {
               // Advance to the next chunk
-              currentChunkIndex++;
+          currentChunkIndex++;
               logEvent(`onend: Scheduling next speakChunk (${currentChunkIndex + 1}).`);
               prematureStopRetryCount = 0; // Reset retry count as we successfully moved to the next chunk
               // Small delay before speaking next chunk
-              setTimeout(() => {
+          setTimeout(() => {
                   // Re-check state before speaking, might have been stopped/paused during timeout
                   if (isSpeakingOrPending && !isPaused && !stopRequested) {
-                      speakChunk();
+              speakChunk();
                   } else {
                       logEvent("speakChunk timeout callback: State changed, not speaking next chunk.");
                       if (!isPaused && !stopRequested) resetTTSState(); // Reset if stopped unexpectedly
-                  }
+            }
               }, 100); // Delay helps prevent issues where cancel/speak overlap
-          } else {
+        } else {
               // This was the last chunk
               logEvent("onend: Last chunk finished normally.");
-              resetTTSState();
-          }
+          resetTTSState();
+        }
       } else {
          // --- Handle potential premature stop ---
          // If onend fires but we SHOULD have been speaking (and not paused/stopped)
@@ -803,7 +819,7 @@
     setTimeout(() => {
         logEvent("Starting playback after handlePlay timeout.");
         startPlayback(0); // Start from beginning (index 0)
-    }, 200); // Delay might need adjustment
+    }, 250); // *** Increased delay slightly ***
   }
 
   function startPlayback(startIndex = 0) {
@@ -843,73 +859,95 @@
   function handlePause() {
     logEvent(">>> Pause button clicked <<<");
     if (isSpeakingOrPending && !isPaused && speechSynthesis.speaking) {
+      logEvent(`State before pause: isPaused=${isPaused}, isSpeakingOrPending=${isSpeakingOrPending}, synth.speaking=${speechSynthesis.speaking}, synth.paused=${speechSynthesis.paused}, synth.pending=${speechSynthesis.pending}`);
       isPaused = true;
       stopRequested = false; // Pausing is not stopping
+      try {
       speechSynthesis.pause();
       logEvent("TTS pause requested.");
+      } catch (e) {
+          logEvent(`Error calling pause: ${e.message}. Resetting state.`);
+          resetTTSState();
+      }
     } else { logEvent(`Pause ignored: SpeakingPending=${isSpeakingOrPending}, Paused=${isPaused}, Speaking=${speechSynthesis.speaking}`); }
    }
 
   function handleResume() {
     logEvent(">>> Resume button clicked <<<");
-    if (isSpeakingOrPending && isPaused) { // Check our state flags first
-      isPaused = false;
-      stopRequested = false;
-      logEvent("TTS resume requested.");
+    logEvent(`State before resume: isPaused=${isPaused}, isSpeakingOrPending=${isSpeakingOrPending}, synth.speaking=${speechSynthesis.speaking}, synth.paused=${speechSynthesis.paused}, synth.pending=${speechSynthesis.pending}`);
 
-      if (speechSynthesis.paused) {
-          speechSynthesis.resume();
-          logEvent("Called speechSynthesis.resume().");
-      } else {
-          logEvent("Speech synthesis engine wasn't paused, attempting to restart speakChunk.");
-          // If the engine somehow lost state, try restarting the chunk sequence
-           // Use lastSpokenChunkIndex if valid, otherwise currentChunkIndex
-           const resumeIndex = lastSpokenChunkIndex >= 0 ? lastSpokenChunkIndex : currentChunkIndex;
-           logEvent(`Restarting speakChunk from index ${resumeIndex} after resume attempt.`);
-           // Don't increment index here, just restart the current/last known chunk
-           currentChunkIndex = resumeIndex;
-           setTimeout(() => {
-               if (isSpeakingOrPending && !isPaused && !stopRequested) { // Check state again
-                   speakChunk();
-               }
-           }, 100);
-      }
-    } else { logEvent(`Resume ignored: SpeakingPending=${isSpeakingOrPending}, Paused=${isPaused}, EnginePaused=${speechSynthesis.paused}`); }
-   }
+    if (isSpeakingOrPending && isPaused) { // Check our state flags first
+        stopRequested = false; // Resuming is not stopping
+        cancelInProgress = false; // Ensure cancel flag is clear
+        logEvent("TTS resume requested (state flags checked). Attempting browser resume...");
+
+        // Primarily rely on the browser's resume function
+        if (speechSynthesis.paused) {
+            try {
+      speechSynthesis.resume();
+                isPaused = false; // Update our state only AFTER successful resume call
+                logEvent("Called speechSynthesis.resume() successfully. isPaused set to false.");
+            } catch (e) {
+                logEvent(`Error calling speechSynthesis.resume(): ${e.message} - Resetting state.`);
+                resetTTSState(); // Reset if resume fails
+            }
+        } else {
+            // If the engine wasn't paused, but our state thought it was,
+            // log this inconsistency. Don't try to force anything complex.
+            logEvent("Inconsistent state: isPaused was true, but speechSynthesis.paused was false. Clearing isPaused flag, but taking no further action.");
+            isPaused = false; // Correct our state flag
+            // Let's see if the existing utterance continues or if an error/end occurs naturally.
+        }
+    } else {
+        logEvent(`Resume ignored: SpeakingPending=${isSpeakingOrPending}, Paused=${isPaused}, EnginePaused=${speechSynthesis.paused}`);
+    }
+}
 
   function handleStop(silent = false) {
     if (!silent) logEvent(">>> Stop button clicked <<<");
     else logEvent("handleStop called silently.");
 
+    cancelInProgress = true; // *** Set flag immediately ***
     stopRequested = true; // Set flag immediately
     isSpeakingOrPending = false; // Mark inactive
     isPaused = false; // Ensure not paused
+
+    // --- Aggressive State Reset --- 
+    // Reset crucial state immediately, don't wait for async events
+    utterance = null; 
+    currentChunkIndex = 0;
+    lastSpokenChunkIndex = -1;
+    prematureStopRetryCount = 0;
+    removeHighlight();
+    logEvent("Immediate state reset in handleStop (except cancel call).");
+    // --- End Aggressive State Reset ---
 
     // Cancel synthesis
     try {
         if (speechSynthesis) {
             // Check if there's anything to cancel
             if (speechSynthesis.speaking || speechSynthesis.pending || speechSynthesis.paused) {
-                 logEvent("Calling speechSynthesis.cancel()...");
-                 speechSynthesis.cancel();
-                 // Note: cancel() is async, state update happens after this call returns
+            logEvent("Calling speechSynthesis.cancel()...");
+            speechSynthesis.cancel();
+                 // cancel() is async, subsequent onend/onerror with 'canceled' error should fire
+                 // but we've already reset most state above.
             } else {
                  logEvent("speechSynthesis is idle, no need to cancel.");
+                 cancelInProgress = false; // *** Reset flag if cancel wasn't needed ***
             }
         }
     } catch (e) { logEvent("Minor error during cancel in handleStop: " + e.message)}
 
     // Reset state variables immediately after requesting cancel
     // utterance will be cleared in onend/onerror triggered by cancel() or here if needed
-    utterance = null;
-    currentChunkIndex = 0;
-    lastSpokenChunkIndex = -1;
-    prematureStopRetryCount = 0;
-    removeHighlight();
+    // utterance = null; // Moved above
+    // currentChunkIndex = 0; // Moved above
+    // lastSpokenChunkIndex = -1; // Moved above
+    // prematureStopRetryCount = 0; // Moved above
+    // removeHighlight(); // Moved above
 
-    if (!silent) logEvent("Stop requested, state flags updated.");
-    // Don't call resetTTSState() directly here, let the onend/onerror triggered by cancel() handle final cleanup.
-    // If cancel() doesn't trigger events reliably, we might need a fallback reset here after a timeout.
+    if (!silent) logEvent("Stop requested, cancel called if necessary.");
+    // We are no longer primarily relying on async events for state reset after stop.
   }
 
    function handleCloseTTS() {
