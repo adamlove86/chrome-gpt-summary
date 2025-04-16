@@ -1,7 +1,17 @@
 // popup.js
 import { getDefaultYouTubePrompt, getDefaultTextPrompt } from './prompt.js';
 
+// Function to handle button press visual feedback
+function handleButtonPress(buttonId) {
+  const button = document.getElementById(buttonId);
+  button.classList.add('button-pressed');
+  setTimeout(() => {
+    button.classList.remove('button-pressed');
+  }, 200); // Remove the class after 200ms
+}
+
 document.getElementById('summariseBtn').addEventListener('click', async () => {
+  handleButtonPress('summariseBtn'); // Add visual feedback
   chrome.tabs.query({ active: true, currentWindow: true }, async function(tabs) {
     const currentTab = tabs[0];
     if (currentTab && currentTab.url && currentTab.url.includes('youtube.com/watch')) {
@@ -28,12 +38,48 @@ document.getElementById('summariseBtn').addEventListener('click', async () => {
   });
 });
 
-document.getElementById('downloadLogBtn').addEventListener('click', () => {
-  chrome.runtime.sendMessage({ action: "downloadLog" }, (response) => {
-    if (response.status === "done") {
-      console.log("Log file download initiated.");
-    } else {
-      console.error("Error downloading log file: " + response.message);
+// Remove the old download log button listener
+// document.getElementById('downloadLogBtn').addEventListener('click', () => {
+//   handleButtonPress('downloadLogBtn'); // Add visual feedback
+//   chrome.runtime.sendMessage({ action: "downloadLog" }, (response) => {
+//     if (response.status === "done") {
+//       console.log("Log file download initiated.");
+//     } else {
+//       console.error("Error downloading log file: " + response.message);
+//     }
+//   });
+// });
+
+// Add new block site button listener
+document.getElementById('blockSiteBtn').addEventListener('click', () => {
+  handleButtonPress('blockSiteBtn');
+  chrome.tabs.query({ active: true, currentWindow: true }, async function(tabs) {
+    const currentTab = tabs[0];
+    if (currentTab && currentTab.url) {
+      try {
+        const url = new URL(currentTab.url);
+        const siteOrigin = url.origin; // e.g., https://www.smh.com.au
+        const siteToBlock = prompt(`Add this site to the blocker list?`, siteOrigin);
+
+        if (siteToBlock) { // If the user didn't cancel the prompt
+          chrome.storage.sync.get({ blockedSites: [] }, (data) => {
+            const blockedSites = data.blockedSites;
+            if (!blockedSites.includes(siteToBlock)) {
+              blockedSites.push(siteToBlock);
+              chrome.storage.sync.set({ blockedSites: blockedSites }, () => {
+                console.log(`${siteToBlock} added to blocked sites.`);
+                // Optional: Provide feedback to the user, e.g., update popup UI
+              });
+            } else {
+              console.log(`${siteToBlock} is already in the blocked list.`);
+              // Optional: Inform the user
+            }
+          });
+        }
+      } catch (e) {
+        console.error("Could not process URL:", e);
+        // Optional: Inform the user about the error
+      }
     }
   });
 });

@@ -3,11 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <title>Summarise Text</title>
+    <style>
+        .button-pressed {
+            background-color: #d3d3d3; /* Light grey background */
+            border-style: inset; /* Gives a 'pressed' look */
+        }
+        button {
+            margin-right: 5px; /* Add some space between buttons */
+        }
+    </style>
 </head>
 <body>
     <h1>Summarise Text</h1>
     <button id="summariseBtn">Summarise Page</button>
-    <button id="downloadLogBtn" style="margin-left:10px;">Download Debug Log</button>
+    <button id="blockSiteBtn">Block Site</button>
     <script type="module" src="popup.js"></script>
 </body>
 </html>

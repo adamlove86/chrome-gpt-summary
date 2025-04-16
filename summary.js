@@ -1,5 +1,14 @@
 // summary.js
 
+// Function to handle button press visual feedback
+function handleButtonPress(buttonId) {
+  const button = document.getElementById(buttonId);
+  button.classList.add('button-pressed');
+  setTimeout(() => {
+    button.classList.remove('button-pressed');
+  }, 200); // Remove the class after 200ms
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   chrome.storage.local.get(['latestSummary', 'summaryPageUrl', 'originalTextLength', 'pageTitle', 'publishedDate', 'wordCount'], (data) => {
     const summary = data.latestSummary || 'No summary available.';
@@ -50,10 +59,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Add event listeners for play and stop buttons
     document.getElementById('playButton').addEventListener('click', () => {
+      handleButtonPress('playButton'); // Add visual feedback
       speakText(window.summaryText);
     });
 
+    // Add event listener for pause button
+    document.getElementById('pauseButton')?.addEventListener('click', () => {
+      handleButtonPress('pauseButton'); // Add visual feedback
+      chrome.tts.pause();
+    });
+
+    // Add event listener for resume button
+    document.getElementById('resumeButton')?.addEventListener('click', () => {
+      handleButtonPress('resumeButton'); // Add visual feedback
+      chrome.tts.resume();
+    });
+
     document.getElementById('stopButton').addEventListener('click', () => {
+      handleButtonPress('stopButton'); // Add visual feedback
       chrome.tts.stop();
     });
 

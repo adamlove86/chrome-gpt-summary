@@ -55,6 +55,11 @@
       margin-bottom: 10px;
       font-size: 14px; /* Fixed font size */
     }
+    /* Add style for pressed buttons */
+    .button-pressed {
+      background-color: #d3d3d3; /* Light grey background */
+      border-style: inset; /* Gives a 'pressed' look */
+    }
   </style>
 </head>
 <body>
@@ -71,8 +76,10 @@
     <input type="range" id="speechSpeedSlider" min="50" max="150" value="100">
     <span id="speechSpeedDisplay">100%</span>
 
-    <button id="playButton">Play Summary</button>
-    <button id="stopButton">Stop</button>
+    <button id="playButton" aria-label="Play Summary">▶ Play</button>
+    <button id="pauseButton" aria-label="Pause Summary">❚❚ Pause</button>
+    <button id="resumeButton" aria-label="Resume Summary">► Resume</button>
+    <button id="stopButton" aria-label="Stop Summary">■ Stop</button>
   </div>
 
   <div class="footer">

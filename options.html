@@ -1,17 +1,99 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>ChatGPT Summariser Settings</title>
+    <meta charset="UTF-8">
+    <title>Summarise Options</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        label { display: block; margin-top: 10px; }
-        input[type="text"], textarea, select { width: 100%; }
-        button { margin-top: 20px; }
+        body {
+            font-family: sans-serif;
+            padding: 10px 20px;
+            min-width: 500px; /* Increased width */
+        }
+        h1, h2 {
+            margin-bottom: 10px;
+        }
+        h2 {
+             margin-top: 25px;
+             border-top: 1px solid #ccc;
+             padding-top: 15px;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="number"], textarea, select {
+            width: 95%; /* Adjusted width */
+            padding: 5px;
+            margin-top: 3px;
+        }
+        textarea {
+            min-height: 80px;
+        }
+        input[type="checkbox"] {
+            margin-right: 5px;
+        }
+        button {
+            margin-top: 10px;
+            padding: 8px 15px;
+            cursor: pointer;
+        }
+        #settingsForm button[type="submit"] {
+            margin-top: 20px;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+            margin-top: 5px;
+        }
+        li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+        li span {
+            margin-right: 10px;
+        }
+        li button {
+            margin-left: 10px;
+            padding: 3px 8px; /* Smaller remove buttons */
+            margin-top: 0; /* Reset margin */
+        }
+        .add-site-section {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+        }
+        .add-site-section input[type="text"] {
+            flex-grow: 1;
+            margin-right: 10px;
+            width: auto; /* Let flexbox handle width */
+        }
+        .add-site-section button {
+             margin-top: 0; /* Reset margin */
+        }
+        .debug-section button {
+            margin-top: 0;
+        }
+        #speechSpeedValue {
+            margin-left: 10px;
+        }
+
+        /* Add style for pressed buttons */
+        .button-pressed {
+            background-color: #d3d3d3; /* Light grey background */
+            border-style: inset; /* Gives a 'pressed' look */
+        }
+
     </style>
 </head>
 <body>
-    <h1>ChatGPT Summariser Settings</h1>
+    <h1>Summarise Settings</h1>
+
     <form id="settingsForm">
+        <h2>API & Model Configuration</h2>
         <label for="apiKey">API Key:</label>
         <input type="text" id="apiKey" required>
 
@@ -26,28 +108,40 @@
 
         <label for="debug">
             <input type="checkbox" id="debug">
-            Enable Debug Mode
+            Enable Debug Mode (shows alerts on error)
         </label>
 
+        <h2>Prompts</h2>
         <label for="youtubePrompt">YouTube Prompt:</label>
-        <textarea id="youtubePrompt" rows="10" required></textarea>
+        <textarea id="youtubePrompt" required></textarea>
 
         <label for="textPrompt">Text Prompt:</label>
-        <textarea id="textPrompt" rows="10" required></textarea>
-
-        <hr>
+        <textarea id="textPrompt" required></textarea>
 
         <h2>Default Speech Settings</h2>
-
         <label for="defaultVoice">Default Voice:</label>
         <select id="defaultVoice"></select>
 
         <label for="speechSpeed">Default Speech Speed (%):</label>
-        <input type="range" id="speechSpeed" min="50" max="150" value="100">
-        <span id="speechSpeedValue">100%</span>
+        <div>
+            <input type="range" id="speechSpeed" min="50" max="150" value="100" style="vertical-align: middle;">
+            <span id="speechSpeedValue">100%</span>
+        </div>
 
-        <button type="submit">Save Settings</button>
+        <button type="submit" id="saveSettingsBtn">Save All Settings</button>
     </form>
+
+    <h2>Popup Blocker Sites</h2>
+    <p>Add website origins (e.g., https://www.example.com) to stop page loading after initial HTML.</p>
+    <ul id="blockedSitesList"></ul>
+    <div class="add-site-section">
+        <input type="text" id="newSiteOrigin" placeholder="https://example.com">
+        <button id="addSiteBtn">Add Site</button>
+    </div>
+
+    <h2 class="debug-section">Debugging</h2>
+    <button id="downloadLogBtn">Download Debug Log</button>
+
     <script type="module" src="options.js"></script>
 </body>
 </html>

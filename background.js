@@ -135,11 +135,11 @@ async function summariseText(text, pageUrl, contentType, pageTitle, publishedDat
     const wordCount = text.trim().split(/\s+/).length;
 
     if (contentType === 'youtube') {
-      prompt += "\n\nPlease provide a detailed summary following the guidelines.";
+      prompt += "\n\nPlease provide a detailed summary following the guidelines. Do not include any headers or titles like 'Overall Summary' or 'Summary' in your response.";
     } else {
       prompt += wordCount < 500
-        ? "\n\nPlease provide a concise, single-paragraph summary."
-        : "\n\nPlease provide a detailed summary following the guidelines.";
+        ? "\n\nPlease provide a concise, single-paragraph summary. Do not include any headers or titles like 'Overall Summary' or 'Summary' in your response."
+        : "\n\nPlease provide a detailed summary following the guidelines. Do not include any headers or titles like 'Overall Summary' or 'Summary' in your response.";
     }
 
     const apiKey = await getApiKey();

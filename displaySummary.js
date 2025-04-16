@@ -483,15 +483,9 @@
       if (!isSpeakingOrPending) resetTTSState(); return;
     }
     // Add more checks for robustness
-     if (!speechSynthesis) {
-        logEvent("speakChunk: speechSynthesis API not available!");
-        resetTTSState(); return;
-    }
-    // Check if browser thinks it's speaking but our state says otherwise (rare edge case)
-    if (speechSynthesis.speaking && !utterance && lastSpokenChunkIndex !== currentChunkIndex) {
-        logEvent(`speakChunk: Browser speaking but no utterance? lastSpoken=${lastSpokenChunkIndex}, current=${currentChunkIndex}. Cancelling.`);
-        handleStop(); // Force stop and reset
-        return;
+    if (!speechSynthesis) {
+      logEvent("speakChunk: speechSynthesis API not available!");
+      resetTTSState(); return;
     }
 
     const textChunk = currentChunks[currentChunkIndex];
@@ -503,16 +497,26 @@
 
     utterance = new SpeechSynthesisUtterance(textChunk);
 
-    // Voice selection (same as before)
-    try { availableVoices = speechSynthesis.getVoices(); } catch (e) { logEvent("Error refreshing voices."); availableVoices = []; }
+    // Voice selection
+    try { 
+      availableVoices = speechSynthesis.getVoices(); 
+    } catch (e) { 
+      logEvent("Error refreshing voices."); 
+      availableVoices = []; 
+    }
     const chosenVoiceName = voiceDropdown ? voiceDropdown.value : null;
     const selectedVoice = chosenVoiceName ? availableVoices.find(v => v.name === chosenVoiceName) : null;
-    if (selectedVoice) { utterance.voice = selectedVoice; } else { logEvent(`Voice "${chosenVoiceName || 'none'}" invalid, using default.`); }
+    if (selectedVoice) { 
+      utterance.voice = selectedVoice; 
+    } else { 
+      logEvent(`Voice "${chosenVoiceName || 'none'}" invalid, using default.`); 
+    }
     utterance.rate = speedSlider ? (parseFloat(speedSlider.value) / 100) : 1.0;
-    utterance.pitch = 1.0; utterance.volume = 1.0;
+    utterance.pitch = 1.0; 
+    utterance.volume = 1.0;
 
-    // Event Handlers (same as before, with logging)
-    utterance.onerror = (event) => { /* ... (same detailed logging) ... */
+    // Event Handlers
+    utterance.onerror = (event) => {
       console.error("SpeechSynthesisUtterance.onerror Event:", event);
       const errorType = event.error || "unknown error";
       console.error(`TTS Error Details: Type='${errorType}', Chunk Index='${currentChunkIndex}', Voice='${utterance.voice ? utterance.voice.name : 'default'}', Lang='${utterance.lang || 'N/A'}', Text='${textChunk.substring(0, 100)}...'`);
@@ -521,29 +525,38 @@
       if (errorType === 'network') userMessage += ' Check internet connection.';
       if (errorType === 'synthesis-failed') userMessage += ' Try a different voice.';
       if (errorType === 'audio-busy') userMessage += ' Audio device might be busy.';
-      resetTTSState(); alert(userMessage);
-     };
-    utterance.onend = () => { /* ... (same logic) ... */
+      resetTTSState(); 
+      alert(userMessage);
+    };
+
+    utterance.onend = () => {
       logEvent(`Chunk ${currentChunkIndex + 1} ended.`);
-      lastSpokenChunkIndex = currentChunkIndex; // Update last spoken *after* end
+      lastSpokenChunkIndex = currentChunkIndex;
       utterance = null;
+      
       if (isSpeakingOrPending && !isPaused) {
         if (currentChunkIndex < currentChunks.length - 1) {
           currentChunkIndex++;
           logEvent("onend: Scheduling next speakChunk.");
-          setTimeout(speakChunk, 100);
+          // Add a small delay to ensure the previous utterance is fully cleared
+          setTimeout(() => {
+            if (isSpeakingOrPending && !isPaused) {
+              speakChunk();
+            }
+          }, 100);
         } else {
           logEvent("onend: Last chunk finished.");
           resetTTSState();
         }
-      } else { logEvent(`onend: Not proceeding: speakingOrPending=${isSpeakingOrPending}, isPaused=${isPaused}`); }
-     };
-    utterance.onstart = () => { /* ... (same logic) ... */
-        logEvent(`TTS starting chunk ${currentChunkIndex + 1}/${currentChunks.length}`);
-        // It's better to set lastSpokenChunkIndex here to prevent race conditions
-        // where onend might fire before the next chunk's onstart if delays are short.
-        lastSpokenChunkIndex = currentChunkIndex;
-     };
+      } else {
+        logEvent(`onend: Not proceeding: speakingOrPending=${isSpeakingOrPending}, isPaused=${isPaused}`);
+      }
+    };
+
+    utterance.onstart = () => {
+      logEvent(`TTS starting chunk ${currentChunkIndex + 1}/${currentChunks.length}`);
+      lastSpokenChunkIndex = currentChunkIndex;
+    };
 
     // Speak
     try {
