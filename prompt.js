@@ -17,6 +17,7 @@ function getDefaultYouTubePrompt() {
     - Follow proper Markdown syntax to ensure clarity and readability.
  
  4. **Additional Instructions**:
+    - **Avoid using periods within common abbreviations** (e.g., write "US" instead of "U.S.", "UK" instead of "U.K."). Spell out other abbreviations if feasible or use standard acronyms without periods.
     - Decide whether a single-paragraph summary or a multi-paragraph (sectioned) summary is most appropriate based on the transcript's length and complexity.
     - Ensure that no essential information is omitted and that the summary accurately reflects the content of the transcript.
     - The structure should be universal so that whether the title is straightforward or sensational, the summary provides an objective, comprehensive understanding of the video's true content.`;
@@ -27,7 +28,7 @@ function getDefaultYouTubePrompt() {
  
  1. **Overall Summary**:
     - Begin with a brief paragraph that captures the main points of the entire text.
-    - Mention the text's title. If the title is sensational, provocative, or attention-grabbing — or if it does not accurately reflect the content — explicitly note this in the first sentence. Address both the title’s implications and what the content actually discusses.
+    - Mention the text's title. If the title is sensational, provocative, or attention-grabbing — or if it does not accurately reflect the content — explicitly note this in the first sentence. Address both the title's implications and what the content actually discusses.
  
  2. **Section Summaries**:
     - If additional detail is necessary, break the summary into sections.
@@ -40,7 +41,8 @@ function getDefaultYouTubePrompt() {
     - Ensure proper Markdown syntax for clarity and readability.
  
  4. **Additional Instructions**:
-    - Decide whether a single-paragraph summary or a multi-paragraph (sectioned) summary is most appropriate based on the content’s length and complexity.
+    - **Avoid using periods within common abbreviations** (e.g., write "US" instead of "U.S.", "UK" instead of "U.K."). Spell out other abbreviations if feasible or use standard acronyms without periods.
+    - Decide whether a single-paragraph summary or a multi-paragraph (sectioned) summary is most appropriate based on the content's length and complexity.
     - Ensure the summary accurately reflects the key points without including unnecessary details.
     - Make sure that no important information is omitted from the text.`;
  }

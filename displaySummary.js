@@ -47,6 +47,11 @@
   let ttsInitialized = false;
   let isSpeakingOrPending = false;
   let lastSpokenChunkIndex = -1;
+  let highlightSpanClass = 'tts-highlight'; // CSS class for highlighting
+  let currentHighlightSpan = null; // Reference to the currently highlighted span
+  let stopRequested = false; // Flag to differentiate manual stop from premature end
+  let prematureStopRetryCount = 0; // Counter for retries on premature stops
+  const MAX_PREMATURE_STOP_RETRIES = 3; // Max retries per chunk
 
   // --- Initial Setup ---
   cleanupExistingSidebar();
@@ -197,10 +202,14 @@
         createAndAppendTTSControls();
 
         // --- Append Summary Content AFTER TTS controls ---
-        const htmlSummary = convertMarkdownToHtml(summary);
-        summaryContainer.innerHTML = htmlSummary;
+        const textForChunks = getTextToReadFromSummary(summary); // Get raw text first
+        currentChunks = splitIntoChunks(textForChunks); // Split text into chunks based on the logic
+        summaryContainer.innerHTML = convertTextChunksToHtml(currentChunks); // Convert chunks to HTML spans
         sidebar.appendChild(summaryContainer); // Now append summary container
-        logEvent("Summary content added. Length: " + summary.length);
+        logEvent("Summary content added with spans. Chunks: " + currentChunks.length);
+
+        // Inject highlight styles
+        addHighlightStyles();
 
         // Initialize TTS Logic
         initializeTTS();
@@ -284,35 +293,81 @@
       return dateStr;
     }
   }
-  function convertMarkdownToHtml(markdown) { /* ... (same as before) ... */
-     if (!markdown) return '';
-     markdown = markdown.replace(/^### \*(.*)\*/gim, '<h3 style="font-size: 1.1em; font-style: italic; margin-top: 1em; margin-bottom: 0.5em; color: #444;">$1</h3>');
-     markdown = markdown.replace(/^## \*(.*)\*/gim, '<h2 style="font-size: 1.2em; font-weight: bold; margin-top: 1.2em; margin-bottom: 0.6em; color: #333;">$1</h2>');
-     markdown = markdown.replace(/^# \*(.*)\*/gim, '<h1 style="font-size: 1.4em; font-weight: bold; margin-top: 1.4em; margin-bottom: 0.7em; color: #222;">$1</h1>');
-     markdown = markdown.replace(/\*\*(.*?)\*\*/g, '<strong style="color: #34495e;">$1</strong>');
-     markdown = markdown.replace(/\*(.*?)\*/g, '<em>$1</em>');
-     markdown = markdown.replace(/<red>(.*?)<\/red>/g, '<span style="color:#e74c3c; font-weight: bold;">$1</span>');
-     markdown = markdown.replace(/<blue>(.*?)<\/blue>/g, '<span style="color:#3498db; font-weight: bold;">$1</span>');
-     markdown = markdown.replace(/<green>(.*?)<\/green>/g, '<span style="color:#2ecc71; font-weight: bold;">$1</span>');
-     markdown = markdown.replace(/<orange>(.*?)<\/orange>/g, '<span style="color:#f39c12; font-weight: bold;">$1</span>');
-     markdown = markdown.replace(/\n---\n/g, '<hr style="border: none; border-top: 1px solid #ccc; margin: 1.5em 0;">');
-     const lines = markdown.split('\n');
-     let html = '';
-     let inParagraph = false;
-     lines.forEach((line) => {
-         const trimmedLine = line.trim();
-         if (trimmedLine === '') {
-             if (inParagraph) { html += '</p>'; inParagraph = false; }
-         } else if (trimmedLine.startsWith('<h') || trimmedLine.startsWith('<hr') || trimmedLine.startsWith('<p>') || trimmedLine.startsWith('</p>') || trimmedLine.startsWith('<div') || trimmedLine.startsWith('</div>')) {
-             if (inParagraph) { html += '</p>'; inParagraph = false; }
-             html += line + '\n';
-         } else {
-             if (!inParagraph) { html += '<p style="font-size: 1em; margin-bottom: 0.8em;">'; inParagraph = true; }
-             html += line + ' ';
-         }
-     });
-     if (inParagraph) { html += '</p>'; }
-     return html.replace(/<\/p>\s*<p/g, '</p><p').trim();
+  function convertMarkdownToHtml(markdown) {
+    // Basic Markdown to HTML conversion (same as before)
+    // ... (keep existing conversion logic, but we'll replace its usage)
+    // THIS FUNCTION IS NO LONGER THE PRIMARY WAY TO RENDER THE SUMMARY for TTS
+    // We now use convertTextChunksToHtml for the main summary content.
+    // Keep this function in case it's used elsewhere or for non-TTS display.
+    logEvent("convertMarkdownToHtml called (potentially legacy usage).");
+    let html = markdown
+        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+        .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+        .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>') // Bold
+        .replace(/\*(.*?)\*/gim, '<em>$1</em>')       // Italic
+        .replace(/`([^`]+)`/gim, '<code>$1</code>')   // Inline code
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/gim, '<a href="$2" target="_blank">$1</a>') // Links
+        .replace(/^\s*[-*+]\s+(.*)/gim, '<li>$1</li>') // List items
+        .replace(/<\/li>\s*<li>/gim, '</li><li>')      // Fix list spacing
+        .replace(/(<li>.*<\/li>)/gim, '<ul>$1</ul>')   // Wrap lists
+        .replace(/<\/ul>\s*<ul>/gim, '')               // Merge adjacent lists
+        .replace(/\n/g, '<br>');                       // Paragraphs/line breaks
+
+    return html;
+  }
+
+  function getTextToReadFromSummary(summaryMarkdown) {
+      // Convert markdown to plain text for accurate chunking and speaking.
+      // Remove HTML/Markdown formatting that shouldn't be read aloud.
+      logEvent("Extracting plain text from summary markdown.");
+      let text = summaryMarkdown
+          .replace(/\[([^\]]+)\]\(([^)]+)\)/gim, '$1') // Keep link text, remove URL
+          .replace(/<[^>]*>/g, ' ')                   // Remove HTML tags
+          .replace(/[`*#~]+/g, '')                   // Remove markdown symbols
+          .replace(/\s{2,}/g, ' ')                    // Collapse multiple spaces
+          .trim();
+      logEvent(`Extracted text length: ${text.length}`);
+      return text;
+  }
+
+  function convertTextChunksToHtml(chunks) {
+      // Wrap each chunk in a span for highlighting
+      logEvent(`Converting ${chunks.length} text chunks to HTML spans.`);
+      return chunks.map((chunk, index) =>
+          `<span data-chunk-index="${index}" class="tts-chunk">${escapeHtml(chunk)}</span>`
+      ).join(' '); // Join chunks with spaces for natural reading flow
+  }
+
+  function escapeHtml(unsafe) {
+      if (!unsafe) return '';
+      return unsafe
+           .replace(/&/g, "&amp;")
+           .replace(/</g, "&lt;")
+           .replace(/>/g, "&gt;")
+           .replace(/"/g, "&quot;")
+           .replace(/'/g, "&#039;");
+   }
+
+  function addHighlightStyles() {
+      const styleId = 'tts-highlight-style';
+      if (document.getElementById(styleId)) return; // Style already added
+
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.textContent = `
+          .${highlightSpanClass} {
+              background-color: #ffd700; /* Yellow highlight */
+              color: #000;
+              padding: 0.1em 0;
+              margin: -0.1em 0;
+              border-radius: 3px;
+              box-decoration-break: clone; /* Handle line breaks */
+              -webkit-box-decoration-break: clone; /* Safari */
+          }
+      `;
+      document.head.appendChild(style);
+      logEvent("Highlight styles injected.");
   }
 
   // --- TTS Logic ---
@@ -438,50 +493,56 @@
   }
 
   function splitIntoChunks(text) {
-    logEvent(`splitIntoChunks called with text length: ${text ? text.length : 0}`);
     if (!text) return [];
-    // Split logic (same as before)
-    const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim() !== '');
-    let chunks = [];
-    const MAX_CHUNK_LENGTH = 300;
-    paragraphs.forEach(para => {
-      const sentences = para.match(/[^.!?…]+[.!?…]*(?=\s+|\r?\n|$)/g);
-      if (sentences) {
-        sentences.forEach(sentence => { /* ... (same sub-splitting) ... */
-            let currentSentence = sentence.trim();
-            while (currentSentence.length > MAX_CHUNK_LENGTH) {
-                let splitPos = currentSentence.lastIndexOf(' ', MAX_CHUNK_LENGTH);
-                if (splitPos === -1) splitPos = MAX_CHUNK_LENGTH;
-                chunks.push(currentSentence.substring(0, splitPos));
-                currentSentence = currentSentence.substring(splitPos).trim();
+    logEvent("Splitting text into chunks...");
+
+    // Split primarily by sentences. Also consider line breaks as potential split points.
+    // Regex breakdown:
+    // Match sentence-ending punctuation (. ! ?) followed by space/newline and uppercase letter OR end of string.
+    // OR match double line breaks.
+    // Keep the delimiters.
+    // const chunks = text.match( /[^\.!\?\n]+[\.!\?\n]+|\n\n+|[^\.!\?\n]+/g );
+
+    // Simpler approach: Split by sentence endings (.!?), then handle potential long chunks without punctuation.
+    // Add a space after delimiters to ensure they are treated as separate 'words' if needed,
+    // but use lookbehind/lookahead to not capture the space in the split.
+    // Also split on double newlines.
+    let chunks = text.split(/(?<=[.!?])\s+|\n\s*\n+/).map(s => s.trim()).filter(s => s.length > 0);
+
+    // Further split very long chunks (e.g., > 250 chars) without punctuation
+    const MAX_CHUNK_LENGTH = 250; // Adjust as needed
+    let finalChunks = [];
+    chunks.forEach(chunk => {
+        if (chunk.length > MAX_CHUNK_LENGTH) {
+            logEvent(`Chunk too long (${chunk.length}), splitting further: "${chunk.substring(0, 50)}..."`);
+            // Split by commas or spaces if chunk is too long
+            let subChunks = chunk.split(/(?<=,)\s+/); // Split by comma followed by space
+            if (subChunks.length === 1 && chunk.length > MAX_CHUNK_LENGTH) { // Still too long, split by space
+                subChunks = chunk.match(new RegExp(`.{1,${MAX_CHUNK_LENGTH}}(\\s|$)`, 'g')) || [chunk];
             }
-            if (currentSentence.length > 0) chunks.push(currentSentence);
-        });
-      } else if (para) { /* ... (same paragraph sub-splitting) ... */
-        let currentPara = para.trim();
-         while (currentPara.length > MAX_CHUNK_LENGTH) {
-            let splitPos = currentPara.lastIndexOf(' ', MAX_CHUNK_LENGTH);
-            if (splitPos === -1) splitPos = MAX_CHUNK_LENGTH;
-            chunks.push(currentPara.substring(0, splitPos));
-            currentPara = currentPara.substring(splitPos).trim();
+            finalChunks.push(...subChunks.map(sc => sc.trim()).filter(sc => sc.length > 0));
+        } else {
+            finalChunks.push(chunk);
         }
-        if (currentPara.length > 0) chunks.push(currentPara);
-      }
     });
-    chunks = chunks.filter(chunk => chunk.length > 0);
-    logEvent(`Split text into ${chunks.length} chunks.`);
-    return chunks.length > 0 ? chunks : (text ? [text] : []);
+
+
+    // Clean up empty chunks resulted from splitting
+    finalChunks = finalChunks.filter(chunk => chunk.length > 0);
+    logEvent(`Split text into ${finalChunks.length} chunks.`);
+    return finalChunks.length > 0 ? finalChunks : (text ? [text] : []);
   }
 
   function speakChunk() {
-    logEvent(`speakChunk: Index=${currentChunkIndex}, Chunks=${currentChunks.length}, Paused=${isPaused}, SpeakingPending=${isSpeakingOrPending}`);
-    if (currentChunkIndex >= currentChunks.length) {
-      logEvent("speakChunk: All chunks processed."); resetTTSState(); return;
+    logEvent(`speakChunk: Index=${currentChunkIndex}, Chunks=${currentChunks.length}, Paused=${isPaused}, SpeakingPending=${isSpeakingOrPending}, StopReq=${stopRequested}`);
+    if (stopRequested || currentChunkIndex >= currentChunks.length) {
+      logEvent("speakChunk: Stop requested or all chunks processed.");
+      resetTTSState(); return;
     }
-    if (isPaused || !isSpeakingOrPending) {
-      logEvent(`speakChunk: Bailing out - Paused=${isPaused}, SpeakingPending=${isSpeakingOrPending}`);
-      if (!isSpeakingOrPending) resetTTSState(); return;
-    }
+    // Don't reset if paused, just return
+    if (isPaused) { logEvent("speakChunk: Paused, returning."); return; }
+    if (!isSpeakingOrPending) { logEvent("speakChunk: Not active, resetting."); resetTTSState(); return; }
+
     // Add more checks for robustness
     if (!speechSynthesis) {
       logEvent("speakChunk: speechSynthesis API not available!");
@@ -492,77 +553,176 @@
     if (!textChunk || textChunk.trim().length === 0) {
       logEvent(`speakChunk: Skipping empty chunk at index ${currentChunkIndex}.`);
       currentChunkIndex++;
-      setTimeout(speakChunk, 50); return;
+      setTimeout(speakChunk, 50); // Move to next chunk quickly
+      return;
     }
 
     utterance = new SpeechSynthesisUtterance(textChunk);
+    prematureStopRetryCount = 0; // Reset retry count for the new utterance
 
-    // Voice selection
-    try { 
-      availableVoices = speechSynthesis.getVoices(); 
-    } catch (e) { 
-      logEvent("Error refreshing voices."); 
-      availableVoices = []; 
+    // Voice selection (existing logic)
+    try {
+      availableVoices = speechSynthesis.getVoices();
+    } catch (e) {
+      logEvent("Error refreshing voices: " + e.message);
+      availableVoices = [];
     }
     const chosenVoiceName = voiceDropdown ? voiceDropdown.value : null;
     const selectedVoice = chosenVoiceName ? availableVoices.find(v => v.name === chosenVoiceName) : null;
-    if (selectedVoice) { 
-      utterance.voice = selectedVoice; 
-    } else { 
-      logEvent(`Voice "${chosenVoiceName || 'none'}" invalid, using default.`); 
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+      logEvent(`Using voice: ${selectedVoice.name} (Local: ${selectedVoice.localService})`);
+    } else {
+      logEvent(`Voice "${chosenVoiceName || 'none'}" invalid or not found, using default.`);
+       // Attempt to find a default English voice if available
+       const defaultEngVoice = availableVoices.find(v => v.lang.startsWith('en') && v.default);
+       if (defaultEngVoice) {
+           utterance.voice = defaultEngVoice;
+           logEvent(`Falling back to default English voice: ${defaultEngVoice.name}`);
+       } else {
+           // Let the browser pick its absolute default
+           logEvent("No specific default English voice found, using browser default.");
+       }
     }
     utterance.rate = speedSlider ? (parseFloat(speedSlider.value) / 100) : 1.0;
-    utterance.pitch = 1.0; 
+    utterance.pitch = 1.0;
     utterance.volume = 1.0;
 
-    // Event Handlers
+    // --- Event Handlers ---
     utterance.onerror = (event) => {
       console.error("SpeechSynthesisUtterance.onerror Event:", event);
       const errorType = event.error || "unknown error";
-      console.error(`TTS Error Details: Type='${errorType}', Chunk Index='${currentChunkIndex}', Voice='${utterance.voice ? utterance.voice.name : 'default'}', Lang='${utterance.lang || 'N/A'}', Text='${textChunk.substring(0, 100)}...'`);
-      logEvent(`TTS error on chunk ${currentChunkIndex + 1}: ${errorType}. Voice: ${utterance.voice ? utterance.voice.name : 'default'}`);
+
+      // **FIX:** Check if utterance exists before accessing properties
+      const voiceName = utterance && utterance.voice ? utterance.voice.name : 'default (or utterance nulled)';
+      const lang = utterance ? (utterance.lang || 'N/A') : 'N/A';
+      const textSample = textChunk.substring(0, 100);
+
+      console.error(`TTS Error Details: Type='${errorType}', Chunk Index='${currentChunkIndex}', Voice='${voiceName}', Lang='${lang}', Text='${textSample}...'`);
+      logEvent(`TTS error on chunk ${currentChunkIndex + 1}: ${errorType}. Voice: ${voiceName}`);
+
       let userMessage = `Text-to-speech failed: ${errorType}.`;
-      if (errorType === 'network') userMessage += ' Check internet connection.';
-      if (errorType === 'synthesis-failed') userMessage += ' Try a different voice.';
+      if (errorType === 'network') userMessage += ' Check internet connection or try a local voice.';
+      if (errorType === 'synthesis-failed') userMessage += ' Synthesis failed. Try a different voice.';
       if (errorType === 'audio-busy') userMessage += ' Audio device might be busy.';
-      resetTTSState(); 
-      alert(userMessage);
+      if (errorType === 'canceled' && !stopRequested) userMessage = 'Playback was interrupted.';
+      else if (errorType === 'canceled' && stopRequested) userMessage = null; // Don't show alert if manually stopped
+
+
+      // Don't reset state or alert if it was a manual cancellation
+      if (errorType !== 'canceled' || !stopRequested) {
+          resetTTSState();
+          if (userMessage) alert(userMessage);
+      } else {
+          logEvent("Error was 'canceled' likely due to manual stop/pause, suppressing alert.");
+          resetTTSState(); // Still reset state cleanly
+      }
     };
 
     utterance.onend = () => {
-      logEvent(`Chunk ${currentChunkIndex + 1} ended.`);
-      lastSpokenChunkIndex = currentChunkIndex;
-      utterance = null;
-      
-      if (isSpeakingOrPending && !isPaused) {
-        if (currentChunkIndex < currentChunks.length - 1) {
-          currentChunkIndex++;
-          logEvent("onend: Scheduling next speakChunk.");
-          // Add a small delay to ensure the previous utterance is fully cleared
-          setTimeout(() => {
-            if (isSpeakingOrPending && !isPaused) {
-              speakChunk();
-            }
-          }, 100);
-        } else {
-          logEvent("onend: Last chunk finished.");
+      logEvent(`Chunk ${currentChunkIndex + 1} ended. StopReq=${stopRequested}, Paused=${isPaused}, SpeakingPending=${isSpeakingOrPending}, FinalChunk=${currentChunkIndex >= currentChunks.length - 1}`);
+
+      utterance = null; // Clear current utterance reference
+
+      // --- Highlighting Logic ---
+      // Remove highlight from the ended chunk IF it was the one highlighted
+      if (currentHighlightSpan && currentHighlightSpan.dataset.chunkIndex == currentChunkIndex) {
+         removeHighlight();
+      }
+
+      // --- Premature Stop / Next Chunk Logic ---
+      if (stopRequested) {
+          logEvent("onend: Stop was requested, resetting state.");
           resetTTSState();
-        }
+          return;
+      }
+
+      if (isPaused) {
+          logEvent("onend: Paused state detected, not advancing.");
+          // State remains paused, waiting for resume or stop
+          return;
+      }
+
+      if (isSpeakingOrPending) {
+          if (currentChunkIndex < currentChunks.length - 1) {
+              // Advance to the next chunk
+              currentChunkIndex++;
+              logEvent(`onend: Scheduling next speakChunk (${currentChunkIndex + 1}).`);
+              prematureStopRetryCount = 0; // Reset retry count as we successfully moved to the next chunk
+              // Small delay before speaking next chunk
+              setTimeout(() => {
+                  // Re-check state before speaking, might have been stopped/paused during timeout
+                  if (isSpeakingOrPending && !isPaused && !stopRequested) {
+                      speakChunk();
+                  } else {
+                      logEvent("speakChunk timeout callback: State changed, not speaking next chunk.");
+                      if (!isPaused && !stopRequested) resetTTSState(); // Reset if stopped unexpectedly
+                  }
+              }, 100); // Delay helps prevent issues where cancel/speak overlap
+          } else {
+              // This was the last chunk
+              logEvent("onend: Last chunk finished normally.");
+              resetTTSState();
+          }
       } else {
-        logEvent(`onend: Not proceeding: speakingOrPending=${isSpeakingOrPending}, isPaused=${isPaused}`);
+         // --- Handle potential premature stop ---
+         // If onend fires but we SHOULD have been speaking (and not paused/stopped)
+         // and it wasn't the last chunk, it might be the Chrome bug.
+         if (!isPaused && !stopRequested && currentChunkIndex < currentChunks.length - 1) {
+            logEvent(`onend: Premature stop detected? Retrying chunk ${currentChunkIndex + 1}. Retry count: ${prematureStopRetryCount}`);
+            if (prematureStopRetryCount < MAX_PREMATURE_STOP_RETRIES) {
+                prematureStopRetryCount++;
+                // We don't increment currentChunkIndex here, retry the SAME chunk
+                setTimeout(() => {
+                    if (!stopRequested && !isPaused) { // Check state again
+                       logEvent(`Retrying speakChunk for index ${currentChunkIndex}`);
+                       isSpeakingOrPending = true; // Ensure flag is set before retry
+                       speakChunk();
+                    } else {
+                         logEvent("Premature stop retry aborted due to state change.");
+                         resetTTSState();
+                    }
+                }, 250); // Slightly longer delay for retry
+            } else {
+                logEvent(`Premature stop retry limit reached for chunk ${currentChunkIndex + 1}. Stopping playback.`);
+                alert("Playback stopped unexpectedly. Please try playing again.");
+                resetTTSState();
+            }
+         } else {
+             // End event fired, but state indicates we shouldn't be speaking (e.g., manual stop completed)
+             logEvent(`onend: Playback finished or stopped. speakingOrPending=${isSpeakingOrPending}, isPaused=${isPaused}, stopRequested=${stopRequested}`);
+             if (!isPaused && !stopRequested) { // Ensure reset if not paused or intentionally stopped
+                resetTTSState();
+             }
+         }
       }
     };
 
     utterance.onstart = () => {
       logEvent(`TTS starting chunk ${currentChunkIndex + 1}/${currentChunks.length}`);
-      lastSpokenChunkIndex = currentChunkIndex;
+      lastSpokenChunkIndex = currentChunkIndex; // Update last known spoken index
+      highlightChunk(currentChunkIndex); // Highlight on start
+      prematureStopRetryCount = 0; // Reset retry count on successful start
     };
 
-    // Speak
+    utterance.onboundary = (event) => {
+        if (event.name === 'sentence' || event.name === 'word') {
+             logEvent(`Boundary: Type=${event.name}, Index=${currentChunkIndex}, Char=${event.charIndex}`);
+             // Highlight the current chunk based on the boundary event
+             highlightChunk(currentChunkIndex);
+             // We could potentially use charIndex to highlight words within the chunk later
+        }
+    };
+
+    // --- Speak ---
     try {
       logEvent(`Calling speak() for chunk ${currentChunkIndex + 1}: "${textChunk.substring(0, 50)}..."`);
       speechSynthesis.speak(utterance);
-      logEvent(`speak() called for chunk ${currentChunkIndex + 1}. Pending=${speechSynthesis.pending}, Speaking=${speechSynthesis.speaking}`);
+      // Check status immediately after calling speak
+      // Note: 'speaking' might be false briefly even if successful, 'pending' is often true
+      setTimeout(() => {
+           logEvent(`Status after speak() call (pending=${speechSynthesis.pending}, speaking=${speechSynthesis.speaking}, paused=${speechSynthesis.paused})`);
+      }, 0);
     } catch (error) {
       console.error("Error calling speechSynthesis.speak:", error);
       logEvent(`Error calling speak for chunk ${currentChunkIndex + 1}: ${error.message}`);
@@ -571,20 +731,59 @@
     }
   }
 
-  function resetTTSState() { /* ... (same as before, ensure cancel is called cautiously) ... */
+  function highlightChunk(index) {
+     requestAnimationFrame(() => {
+         const targetSpan = summaryContainer ? summaryContainer.querySelector(`span[data-chunk-index="${index}"]`) : null;
+
+         if (targetSpan) {
+             // Only update if the target is different from the current highlight
+             if (currentHighlightSpan !== targetSpan) {
+                 removeHighlight(); // Remove from previous
+                 targetSpan.classList.add(highlightSpanClass);
+                 currentHighlightSpan = targetSpan;
+                 logEvent(`Highlighted chunk ${index}`);
+
+                 // Optional: Scroll the highlighted element into view
+                 // Consider adding checks to only scroll if it's outside the viewport
+                 // targetSpan.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+             }
+         } else {
+             logEvent(`Highlight target span not found for index ${index}`);
+             removeHighlight(); // Ensure no lingering highlight if target is missing
+         }
+     });
+ }
+
+ function removeHighlight() {
+     if (currentHighlightSpan) {
+         currentHighlightSpan.classList.remove(highlightSpanClass);
+         logEvent(`Removed highlight from chunk ${currentHighlightSpan.dataset.chunkIndex}`);
+         currentHighlightSpan = null;
+     }
+ }
+
+  function resetTTSState() {
     logEvent("Resetting TTS State...");
-    currentChunks = [];
-    currentChunkIndex = 0;
+    isSpeakingOrPending = false; // Explicitly mark as not speaking
     isPaused = false;
-    isSpeakingOrPending = false;
+    stopRequested = false; // Reset stop request flag
+    prematureStopRetryCount = 0; // Reset retry counter
+    // We keep currentChunks and currentChunkIndex as they are for potential resume?
+    // No, let's reset them for a clean stop/start
+    // currentChunks = []; // Keep chunks if we want resume-from-stop later
+    currentChunkIndex = 0; // Reset index to start
+    // lastSpokenChunkIndex should persist until next play? Or reset? Reset for now.
     lastSpokenChunkIndex = -1;
-    utterance = null;
+    utterance = null; // Clear any utterance object
+
+    removeHighlight(); // Remove any active highlight
+
      // Only cancel if the engine *thinks* it's doing something.
      if (speechSynthesis && (speechSynthesis.speaking || speechSynthesis.pending || speechSynthesis.paused)) {
          try {
              logEvent("Issuing cancel in resetTTSState.");
              speechSynthesis.cancel();
-         } catch(e) { logEvent("Minor error during cancel in resetTTSState."); }
+         } catch(e) { logEvent("Minor error during cancel in resetTTSState: " + e.message); }
      }
      logEvent("TTS state reset complete.");
   }
@@ -594,74 +793,139 @@
   function handlePlay() {
     if (!ttsInitialized) { logEvent("Play clicked: TTS not init."); alert("TTS not ready."); return; }
     logEvent(">>> Play button clicked <<<");
-    handleStop(); // Stop robustly first
-    setTimeout(startPlayback, 200); // Increased delay after stop
+    stopRequested = false; // Explicitly allow speaking
+    isPaused = false;
+
+    // Stop any current playback robustly first
+    handleStop(true); // Pass silent=true to avoid duplicate logging/reset
+
+    // Use a timeout to ensure cancel() completes before starting new playback
+    setTimeout(() => {
+        logEvent("Starting playback after handlePlay timeout.");
+        startPlayback(0); // Start from beginning (index 0)
+    }, 200); // Delay might need adjustment
   }
 
-  function startPlayback() {
-      logEvent("startPlayback initiated.");
-      resetTTSState(); // Ensure clean state AGAIN after timeout
-
-      const rawText = getTextToRead(); // Get text *after* ensuring state is clean
-      if (!rawText || rawText === 'No summary available.' || rawText === 'Summary container not found.') {
-          logEvent(`startPlayback: No valid text found: "${rawText}"`); alert("No summary text to read."); return;
-      }
-
-      currentChunks = splitIntoChunks(rawText);
-      if (!currentChunks || currentChunks.length === 0) {
-          logEvent("startPlayback: No chunks created."); alert("Could not process text for reading."); return;
-      }
-
+  function startPlayback(startIndex = 0) {
+      logEvent(`startPlayback initiated from index ${startIndex}.`);
+      stopRequested = false; // Ensure stop flag is false
       isPaused = false;
+
+      // Re-fetch/re-split text only if chunks are empty (e.g., first play)
+      // Otherwise, assume we're resuming or replaying the existing summary
+      if (!currentChunks || currentChunks.length === 0) {
+            const summaryTextElement = document.getElementById('summary-container'); // Re-select in case it was modified
+            const rawText = summaryTextElement ? summaryTextElement.innerText : ''; // Get current text content
+            if (!rawText || rawText.trim().length === 0) {
+                 logEvent(`startPlayback: No valid text found in summary container.`); alert("No summary text to read."); return;
+            }
+             currentChunks = splitIntoChunks(rawText); // Re-split
+             summaryContainer.innerHTML = convertTextChunksToHtml(currentChunks); // Re-render with spans
+      }
+
+
+      if (!currentChunks || currentChunks.length === 0) {
+          logEvent("startPlayback: No chunks available after setup."); alert("Could not process text for reading."); return;
+      }
+
+      // Validate start index
+      currentChunkIndex = (startIndex >= 0 && startIndex < currentChunks.length) ? startIndex : 0;
+      logEvent(`Validated start index: ${currentChunkIndex}`);
+
       isSpeakingOrPending = true; // Mark active
-      currentChunkIndex = 0;
-      lastSpokenChunkIndex = -1; // Reset tracking
-      logEvent("startPlayback: Starting TTS...");
-      speakChunk(); // Start the first chunk
+      lastSpokenChunkIndex = currentChunkIndex -1; // Set to before start index
+      removeHighlight(); // Clear any previous highlight
+
+      logEvent("startPlayback: Starting TTS via speakChunk...");
+      speakChunk(); // Start the sequence
   }
 
-  function handlePause() { /* ... (same as before) ... */
+  function handlePause() {
     logEvent(">>> Pause button clicked <<<");
     if (isSpeakingOrPending && !isPaused && speechSynthesis.speaking) {
       isPaused = true;
+      stopRequested = false; // Pausing is not stopping
       speechSynthesis.pause();
       logEvent("TTS pause requested.");
     } else { logEvent(`Pause ignored: SpeakingPending=${isSpeakingOrPending}, Paused=${isPaused}, Speaking=${speechSynthesis.speaking}`); }
    }
-  function handleResume() { /* ... (same as before) ... */
+
+  function handleResume() {
     logEvent(">>> Resume button clicked <<<");
-    if (isSpeakingOrPending && isPaused && speechSynthesis.paused) {
+    if (isSpeakingOrPending && isPaused) { // Check our state flags first
       isPaused = false;
-      speechSynthesis.resume();
+      stopRequested = false;
       logEvent("TTS resume requested.");
-      if (!speechSynthesis.speaking && !utterance && currentChunkIndex < currentChunks.length) {
-        logEvent("Manually starting next chunk after resume.");
-        setTimeout(speakChunk, 100);
+
+      if (speechSynthesis.paused) {
+          speechSynthesis.resume();
+          logEvent("Called speechSynthesis.resume().");
+      } else {
+          logEvent("Speech synthesis engine wasn't paused, attempting to restart speakChunk.");
+          // If the engine somehow lost state, try restarting the chunk sequence
+           // Use lastSpokenChunkIndex if valid, otherwise currentChunkIndex
+           const resumeIndex = lastSpokenChunkIndex >= 0 ? lastSpokenChunkIndex : currentChunkIndex;
+           logEvent(`Restarting speakChunk from index ${resumeIndex} after resume attempt.`);
+           // Don't increment index here, just restart the current/last known chunk
+           currentChunkIndex = resumeIndex;
+           setTimeout(() => {
+               if (isSpeakingOrPending && !isPaused && !stopRequested) { // Check state again
+                   speakChunk();
+               }
+           }, 100);
       }
-    } else { logEvent(`Resume ignored: SpeakingPending=${isSpeakingOrPending}, Paused=${isPaused}, SpeakingPaused=${speechSynthesis.paused}`); }
+    } else { logEvent(`Resume ignored: SpeakingPending=${isSpeakingOrPending}, Paused=${isPaused}, EnginePaused=${speechSynthesis.paused}`); }
    }
-  function handleStop() { /* ... (same robust stop logic) ... */
-    logEvent(">>> Stop button clicked <<<");
-    isSpeakingOrPending = false; // Mark inactive immediately
-    isPaused = false;
+
+  function handleStop(silent = false) {
+    if (!silent) logEvent(">>> Stop button clicked <<<");
+    else logEvent("handleStop called silently.");
+
+    stopRequested = true; // Set flag immediately
+    isSpeakingOrPending = false; // Mark inactive
+    isPaused = false; // Ensure not paused
+
+    // Cancel synthesis
     try {
         if (speechSynthesis) {
-            logEvent("Calling speechSynthesis.cancel()...");
-            speechSynthesis.cancel();
+            // Check if there's anything to cancel
+            if (speechSynthesis.speaking || speechSynthesis.pending || speechSynthesis.paused) {
+                 logEvent("Calling speechSynthesis.cancel()...");
+                 speechSynthesis.cancel();
+                 // Note: cancel() is async, state update happens after this call returns
+            } else {
+                 logEvent("speechSynthesis is idle, no need to cancel.");
+            }
         }
-    } catch (e) { logEvent("Minor error during cancel in handleStop.")}
-    resetTTSState(); // Reset variables immediately after requesting cancel
-   }
-   function handleCloseTTS() { /* ... (same as before) ... */
+    } catch (e) { logEvent("Minor error during cancel in handleStop: " + e.message)}
+
+    // Reset state variables immediately after requesting cancel
+    // utterance will be cleared in onend/onerror triggered by cancel() or here if needed
+    utterance = null;
+    currentChunkIndex = 0;
+    lastSpokenChunkIndex = -1;
+    prematureStopRetryCount = 0;
+    removeHighlight();
+
+    if (!silent) logEvent("Stop requested, state flags updated.");
+    // Don't call resetTTSState() directly here, let the onend/onerror triggered by cancel() handle final cleanup.
+    // If cancel() doesn't trigger events reliably, we might need a fallback reset here after a timeout.
+  }
+
+   function handleCloseTTS() {
         logEvent(">>> Close TTS button clicked <<<");
-        handleStop();
+        handleStop(); // Stop TTS
         if(ttsContainer) ttsContainer.style.display = 'none';
         if (openTTSButton) openTTSButton.style.display = 'block';
     }
-   function handleCloseSidebar() { /* ... (same as before) ... */
+
+   function handleCloseSidebar() {
         logEvent(">>> Close Sidebar button clicked <<<");
-        handleStop();
+        handleStop(); // Stop TTS
         if(sidebar) sidebar.remove();
+        // Remove injected styles
+        const styleElement = document.getElementById('tts-highlight-style');
+        if (styleElement) styleElement.remove();
    }
 
   // Final log
