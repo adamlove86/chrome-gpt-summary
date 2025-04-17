@@ -84,6 +84,12 @@ document.getElementById('blockSiteBtn').addEventListener('click', () => {
   });
 });
 
+// Listener for the new Options button
+document.getElementById('optionsBtn').addEventListener('click', () => {
+  handleButtonPress('optionsBtn'); // Add visual feedback
+  chrome.runtime.openOptionsPage();
+});
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "summariseText") {
     summariseText(request.text, request.pageUrl, request.contentType, request.pageTitle, request.publishedDate, sender.tab.id);

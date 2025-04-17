@@ -43,6 +43,8 @@
   let pauseButton = null;
   let resumeButton = null;
   let stopButton = null;
+  let nextButton = null;
+  let prevButton = null;
 
   // TTS State
   let availableVoices = [];
@@ -52,6 +54,7 @@
   let isPaused = false;
   let ttsInitialized = false;
   let isSpeakingOrPending = false;
+  let pausedChunkIndex = -1; // NEW: Store index on pause
   let lastSpokenChunkIndex = -1;
   let highlightSpanClass = 'tts-highlight'; // CSS class for highlighting
   let currentHighlightSpan = null; // Reference to the currently highlighted span
@@ -63,6 +66,7 @@
   // --- Initial Setup ---
   cleanupExistingSidebar();
   createSidebarUI();
+  applyTheme();
   appendSidebar();
   loadSummaryAndInit();
 
@@ -201,7 +205,13 @@
         openTTSButton.addEventListener('click', () => {
             if(ttsContainer) ttsContainer.style.display = 'block';
             if (openTTSButton) openTTSButton.style.display = 'none';
-            logEvent("TTS container displayed.");
+            logEvent("TTS container displayed, attempting to autoplay.");
+            // Attempt to start playback automatically
+            if (typeof handlePlay === 'function') {
+                handlePlay();
+            } else {
+                logEvent("Error: handlePlay function not found for autoplay.");
+            }
         });
         sidebar.appendChild(openTTSButton); // Append button
 
@@ -267,6 +277,13 @@
       ttsContainer.appendChild(document.createElement('br'));
       ttsContainer.appendChild(document.createElement('br'));
 
+      // Previous Button
+      prevButton = document.createElement('button');
+      prevButton.textContent = '<< Prev';
+      prevButton.setAttribute('aria-label', 'Previous Sentence');
+      prevButton.style.cssText = controlStyles + `background-color: #95a5a6; color: white; border-color: #95a5a6; margin-right: 15px;`; // Add spacing
+      ttsContainer.appendChild(prevButton);
+
       playButton = document.createElement('button');
       playButton.textContent = '▶ Play'; /* ...styles... */ playButton.setAttribute('aria-label', 'Play Summary'); playButton.style.cssText = controlStyles + `background-color: #2ecc71; color: white; border-color: #2ecc71;`;
       ttsContainer.appendChild(playButton);
@@ -279,6 +296,13 @@
       stopButton = document.createElement('button');
       stopButton.textContent = '■ Stop'; /* ...styles... */ stopButton.setAttribute('aria-label', 'Stop Summary'); stopButton.style.cssText = controlStyles + `background-color: #e74c3c; color: white; border-color: #e74c3c;`;
       ttsContainer.appendChild(stopButton);
+
+      // Next Button
+      nextButton = document.createElement('button');
+      nextButton.textContent = 'Next >>';
+      nextButton.setAttribute('aria-label', 'Next Sentence');
+      nextButton.style.cssText = controlStyles + `background-color: #95a5a6; color: white; border-color: #95a5a6; margin-left: 15px;`; // Add spacing
+      ttsContainer.appendChild(nextButton);
 
       // *** Insert TTS container BEFORE the summary container ***
       sidebar.appendChild(ttsContainer); // Append to sidebar structure
@@ -364,17 +388,140 @@
       style.id = styleId;
       style.textContent = `
           .${highlightSpanClass} {
-              background-color: #ffd700; /* Yellow highlight */
-              color: #000;
+              background-color: #ffd700 !important; /* Yellow highlight - use !important to override potential dark mode styles */
+              color: #000 !important;
               padding: 0.1em 0;
               margin: -0.1em 0;
               border-radius: 3px;
               box-decoration-break: clone; /* Handle line breaks */
               -webkit-box-decoration-break: clone; /* Safari */
           }
+
+          /* Dark Mode Styles */
+          #summary-sidebar.dark-mode {
+              background-color: #2e2e2e;
+              color: #e0e0e0;
+              border-left: 1px solid #555;
+          }
+          #summary-sidebar.dark-mode h1,
+          #summary-sidebar.dark-mode h2,
+          #summary-sidebar.dark-mode h3 {
+              color: #f5f5f5;
+          }
+          #summary-sidebar.dark-mode div,
+          #summary-sidebar.dark-mode p,
+          #summary-sidebar.dark-mode span,
+          #summary-sidebar.dark-mode label,
+          #summary-sidebar.dark-mode li span {
+              color: #e0e0e0;
+          }
+          #summary-sidebar.dark-mode strong {
+              color: #f0f0f0;
+          }
+          #summary-sidebar.dark-mode a {
+              color: #7bb3ff;
+          }
+          #summary-sidebar.dark-mode a:visited {
+              color: #b39ddb; /* Lighter purple for visited links */
+          }
+          #summary-sidebar.dark-mode button {
+              background-color: #555;
+              color: #e0e0e0;
+              border: 1px solid #777;
+          }
+          #summary-sidebar.dark-mode button:hover {
+               background-color: #666;
+          }
+          #summary-sidebar.dark-mode #tts-controls {
+              background-color: #3a3a3a;
+              border-top: 1px solid #555;
+              border-bottom: 1px solid #555;
+          }
+          #summary-sidebar.dark-mode select,
+          #summary-sidebar.dark-mode input[type="range"] {
+              background-color: #444;
+              color: #e0e0e0;
+              border: 1px solid #666;
+          }
+          /* Specific button overrides for dark mode */
+          #summary-sidebar.dark-mode button[aria-label="Close Summary Sidebar"] {
+             background-color: #7c2c2c; /* Darker Red */
+             color: #f0f0f0;
+          }
+           #summary-sidebar.dark-mode button[aria-label="Open Text-to-Speech Controls"] {
+             background-color: #2a68a1; /* Darker Blue */
+             color: #f0f0f0;
+          }
+          #summary-sidebar.dark-mode button[aria-label="Close Text-to-Speech Controls"] {
+             background-color: #4f4f4f;
+             color: #e0e0e0;
+          }
+           #summary-sidebar.dark-mode button[aria-label="Play Summary"] {
+              background-color: #24804d; /* Darker Green */
+              color: #f0f0f0;
+              border-color: #24804d;
+           }
+           #summary-sidebar.dark-mode button[aria-label="Pause Summary"] {
+              background-color: #a86c0d; /* Darker Orange */
+              color: #f0f0f0;
+              border-color: #a86c0d;
+           }
+           #summary-sidebar.dark-mode button[aria-label="Resume Summary"] {
+              background-color: #256a9e; /* Darker Blue */
+              color: #f0f0f0;
+              border-color: #256a9e;
+           }
+            #summary-sidebar.dark-mode button[aria-label="Stop Summary"] {
+              background-color: #9c3428; /* Darker Red */
+              color: #f0f0f0;
+              border-color: #9c3428;
+           }
+           /* Styles for Prev/Next Buttons in Dark Mode */
+           #summary-sidebar.dark-mode button[aria-label="Previous Sentence"],
+           #summary-sidebar.dark-mode button[aria-label="Next Sentence"] {
+               background-color: #6c7a7b; /* Darker Grey */
+               color: #e0e0e0;
+               border-color: #6c7a7b;
+           }
       `;
       document.head.appendChild(style);
-      logEvent("Highlight styles injected.");
+      logEvent("Highlight and theme styles injected.");
+  }
+
+  // --- Theme Detection --- 
+  function isDarkMode() {
+      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          logEvent("Dark mode detected via prefers-color-scheme.");
+          return true;
+      }
+      // Fallback: Check body background color
+      try {
+          const bodyBgColor = window.getComputedStyle(document.body).backgroundColor;
+          const rgb = bodyBgColor.match(/\d+/g);
+          if (rgb && rgb.length >= 3) {
+              // Simple brightness check (sum of RGB values)
+              const brightness = parseInt(rgb[0]) + parseInt(rgb[1]) + parseInt(rgb[2]);
+              if (brightness < 382) { // Threshold for darkness (adjust if needed)
+                   logEvent(`Dark mode detected via body background color: ${bodyBgColor} (Brightness: ${brightness})`);
+                   return true;
+              }
+          }
+      } catch (e) {
+          logEvent("Could not determine theme from body background color: " + e.message);
+      }
+      logEvent("Defaulting to light mode.");
+      return false;
+  }
+
+  function applyTheme() {
+       if (!sidebar) return;
+       if (isDarkMode()) {
+           sidebar.classList.add('dark-mode');
+           logEvent("Applied dark mode class to sidebar.");
+       } else {
+           sidebar.classList.remove('dark-mode');
+           logEvent("Ensured dark mode class is not present on sidebar.");
+       }
   }
 
   // --- TTS Logic ---
@@ -454,7 +601,7 @@
   }
 
   function setupTTSListeners() {
-      if (!speedSlider || !voiceDropdown || !playButton || !pauseButton || !resumeButton || !stopButton || !closeTTSBtn) {
+      if (!speedSlider || !voiceDropdown || !playButton || !pauseButton || !resumeButton || !stopButton || !closeTTSBtn || !prevButton || !nextButton) {
           logEvent("TTS listeners setup failed: One or more UI elements not found.");
           // Attempt to find them again? Or disable TTS?
            console.error("TTS UI elements missing:", { speedSlider, voiceDropdown, playButton /* etc */ });
@@ -481,6 +628,8 @@
       resumeButton.addEventListener('click', handleResume);
       stopButton.addEventListener('click', handleStop);
       closeTTSBtn.addEventListener('click', handleCloseTTS);
+      prevButton.addEventListener('click', handlePreviousChunk);
+      nextButton.addEventListener('click', handleNextChunk);
       logEvent("TTS listeners attached.");
   }
 
@@ -625,12 +774,15 @@
 
       // Don't reset state or alert if it was a manual cancellation
       if (errorType !== 'canceled' || !stopRequested) {
-      resetTTSState(); 
-          if (userMessage) alert(userMessage);
+          resetTTSState();
+          // if (userMessage) alert(userMessage); // Remove the alert, keep logging
+          // Log the user message instead of showing an alert
+          if (userMessage) {
+              logEvent(`TTS Playback Issue (Not Alerting User): ${userMessage}`);
+          }
       } else {
           logEvent("Error was 'canceled' likely due to manual stop/pause, suppressing alert.");
           cancelInProgress = false; // Cancellation seems complete
-          resetTTSState(); // Still reset state cleanly
       }
     };
 
@@ -806,6 +958,36 @@
 
   // --- Button Handlers ---
 
+  // NEW Helper function to handle restarting playback from the highlighted chunk
+  function restartPlaybackFromHighlight() {
+    logEvent("Executing restartPlaybackFromHighlight...");
+    let resumeIndex = -1;
+
+    // Try getting index from the highlighted span
+    if (currentHighlightSpan && currentHighlightSpan.dataset.chunkIndex) {
+        resumeIndex = parseInt(currentHighlightSpan.dataset.chunkIndex, 10);
+        logEvent(`Attempting restart from highlighted chunk index: ${resumeIndex}`);
+    } else {
+        // Fallback: try restarting from the chunk *after* the last known successful start
+        resumeIndex = lastSpokenChunkIndex + 1;
+        logEvent(`Highlight span not found, falling back to index after last spoken: ${resumeIndex}`);
+    }
+
+    // Validate index
+    if (resumeIndex >= 0 && resumeIndex < currentChunks.length) {
+        // Stop any residual activity first (belt and suspenders)
+        handleStop(true); // Silent stop
+        // Use timeout to allow cancel to process before starting again
+        setTimeout(() => {
+             logEvent(`Restarting playback via startPlayback(${resumeIndex}) after timeout.`);
+             startPlayback(resumeIndex);
+        }, 150); // Delay to ensure stop/cancel finishes
+    } else {
+        logEvent(`Invalid resume index calculated: ${resumeIndex}. Cannot restart. Resetting.`);
+        resetTTSState(); // Reset fully if we can't determine where to resume
+    }
+  }
+
   function handlePlay() {
     if (!ttsInitialized) { logEvent("Play clicked: TTS not init."); alert("TTS not ready."); return; }
     logEvent(">>> Play button clicked <<<");
@@ -858,48 +1040,75 @@
 
   function handlePause() {
     logEvent(">>> Pause button clicked <<<");
+    // Only pause if actively speaking
     if (isSpeakingOrPending && !isPaused && speechSynthesis.speaking) {
-      logEvent(`State before pause: isPaused=${isPaused}, isSpeakingOrPending=${isSpeakingOrPending}, synth.speaking=${speechSynthesis.speaking}, synth.paused=${speechSynthesis.paused}, synth.pending=${speechSynthesis.pending}`);
+      logEvent(`State before pause: isPaused=${isPaused}, isSpeakingOrPending=${isSpeakingOrPending}, synth.speaking=${speechSynthesis.speaking}`);
+      // Store the current index BEFORE pausing
+      pausedChunkIndex = currentChunkIndex;
       isPaused = true;
       stopRequested = false; // Pausing is not stopping
+      // Keep the highlight on the paused chunk
+      logEvent(`Storing pausedChunkIndex: ${pausedChunkIndex}. Keeping highlight.`);
+
       try {
-      speechSynthesis.pause();
-      logEvent("TTS pause requested.");
+          speechSynthesis.pause();
+          logEvent("TTS pause requested.");
       } catch (e) {
           logEvent(`Error calling pause: ${e.message}. Resetting state.`);
           resetTTSState();
       }
-    } else { logEvent(`Pause ignored: SpeakingPending=${isSpeakingOrPending}, Paused=${isPaused}, Speaking=${speechSynthesis.speaking}`); }
+    } else { 
+        logEvent(`Pause ignored: SpeakingPending=${isSpeakingOrPending}, Paused=${isPaused}, Speaking=${speechSynthesis.speaking}`); 
+    }
    }
 
   function handleResume() {
     logEvent(">>> Resume button clicked <<<");
-    logEvent(`State before resume: isPaused=${isPaused}, isSpeakingOrPending=${isSpeakingOrPending}, synth.speaking=${speechSynthesis.speaking}, synth.paused=${speechSynthesis.paused}, synth.pending=${speechSynthesis.pending}`);
+    logEvent(`State before resume: isPaused=${isPaused}, pausedChunkIndex=${pausedChunkIndex}, isSpeakingOrPending=${isSpeakingOrPending}, synth.paused=${speechSynthesis.paused}`);
 
-    if (isSpeakingOrPending && isPaused) { // Check our state flags first
-        stopRequested = false; // Resuming is not stopping
-        cancelInProgress = false; // Ensure cancel flag is clear
-        logEvent("TTS resume requested (state flags checked). Attempting browser resume...");
+    if (isPaused) {
+        // We were intentionally paused
+        isPaused = false;
+        stopRequested = false;
+        cancelInProgress = false;
+        logEvent("Attempting to resume from paused state...");
 
-        // Primarily rely on the browser's resume function
         if (speechSynthesis.paused) {
-            try {
-      speechSynthesis.resume();
-                isPaused = false; // Update our state only AFTER successful resume call
-                logEvent("Called speechSynthesis.resume() successfully. isPaused set to false.");
-            } catch (e) {
-                logEvent(`Error calling speechSynthesis.resume(): ${e.message} - Resetting state.`);
-                resetTTSState(); // Reset if resume fails
-            }
+             // Browser thinks it's paused, try resuming natively
+             try {
+                 speechSynthesis.resume();
+                 logEvent("Called speechSynthesis.resume(). State might take time to update.");
+                 // We optimistically assume resume worked. If speech doesn't actually start,
+                 // subsequent checks or the onend handler with retry might catch it.
+                 // OR, we could add a setTimeout check here:
+                 // setTimeout(() => {
+                 //    if (!speechSynthesis.speaking && isSpeakingOrPending) {
+                 //        logEvent("Resume call didn't seem to start speech. Forcing playback from paused index.");
+                 //        startPlayback(pausedChunkIndex);
+                 //    }
+                 // }, 150);
+             } catch (e) {
+                 logEvent(`Error calling speechSynthesis.resume(): ${e.message} - Forcing playback from paused index.`);
+                 // If resume call itself fails, force start from the stored index
+                 startPlayback(pausedChunkIndex);
+             }
         } else {
-            // If the engine wasn't paused, but our state thought it was,
-            // log this inconsistency. Don't try to force anything complex.
-            logEvent("Inconsistent state: isPaused was true, but speechSynthesis.paused was false. Clearing isPaused flag, but taking no further action.");
-            isPaused = false; // Correct our state flag
-            // Let's see if the existing utterance continues or if an error/end occurs naturally.
+            // Browser wasn't paused, even though our flag was set.
+            // This indicates an unexpected stop occurred while we thought we were paused,
+            // or the pause command didn't register correctly.
+            logEvent("Inconsistent state: isPaused flag was true, but browser wasn't paused. Forcing playback from stored paused index.");
+            startPlayback(pausedChunkIndex);
         }
+        // Reset paused index after attempting resume
+        pausedChunkIndex = -1; 
+
+    } else if (isSpeakingOrPending) {
+         // Resume clicked while speaking - essentially do nothing?
+         logEvent("Resume clicked while already speaking. Ignoring.");
     } else {
-        logEvent(`Resume ignored: SpeakingPending=${isSpeakingOrPending}, Paused=${isPaused}, EnginePaused=${speechSynthesis.paused}`);
+        // Resume clicked while completely stopped - treat as Play
+        logEvent("Resume clicked when not active. Treating as Play.");
+        handlePlay();
     }
 }
 
@@ -911,6 +1120,7 @@
     stopRequested = true; // Set flag immediately
     isSpeakingOrPending = false; // Mark inactive
     isPaused = false; // Ensure not paused
+    pausedChunkIndex = -1; // Reset paused index on stop
 
     // --- Aggressive State Reset --- 
     // Reset crucial state immediately, don't wait for async events
@@ -965,6 +1175,37 @@
         const styleElement = document.getElementById('tts-highlight-style');
         if (styleElement) styleElement.remove();
    }
+
+  // NEW: Handler for Previous Chunk button
+  function handlePreviousChunk() {
+      logEvent(">>> Previous Chunk button clicked <<<");
+      if (currentChunkIndex > 0) {
+          const targetIndex = currentChunkIndex - 1;
+          logEvent(`Attempting to move to previous chunk: Index ${targetIndex}`);
+          handleStop(true); // Stop current speech silently
+          setTimeout(() => startPlayback(targetIndex), 150); // Start playback from previous index after delay
+      } else {
+          logEvent("Already at the first chunk.");
+          // Optionally, restart the first chunk?
+          // handleStop(true);
+          // setTimeout(() => startPlayback(0), 150);
+      }
+  }
+
+  // NEW: Handler for Next Chunk button
+  function handleNextChunk() {
+      logEvent(">>> Next Chunk button clicked <<<");
+      if (currentChunkIndex < currentChunks.length - 1) {
+          const targetIndex = currentChunkIndex + 1;
+          logEvent(`Attempting to move to next chunk: Index ${targetIndex}`);
+          handleStop(true); // Stop current speech silently
+          setTimeout(() => startPlayback(targetIndex), 150); // Start playback from next index after delay
+      } else {
+          logEvent("Already at the last chunk.");
+          // Optionally stop here? Or let it finish if playing?
+          handleStop(true); // Stop if user clicks next on last chunk
+      }
+  }
 
   // Final log
   logEvent("displaySummary.js execution completed.");

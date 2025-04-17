@@ -141,6 +141,14 @@
 
     <h2 class="debug-section">Debugging</h2>
     <button id="downloadLogBtn">Download Debug Log</button>
+    <button id="clearLogBtn" style="margin-left: 10px; background-color: #e74c3c; color: white;">Clear Debug Log</button>
+    <button id="viewLogBtn" style="margin-left: 10px;">View Recent Logs</button>
+
+    <div id="logViewer" style="margin-top: 15px; display: none; border: 1px solid #ccc; padding: 10px; background-color: #f8f8f8;">
+      <h3>Recent Logs (Last 30 lines)</h3>
+      <pre id="logContent" style="max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;"></pre>
+      <button id="closeLogViewerBtn" style="margin-top: 10px;">Close Viewer</button>
+    </div>
 
     <script type="module" src="options.js"></script>
 </body>

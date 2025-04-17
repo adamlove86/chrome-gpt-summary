@@ -2,10 +2,13 @@
 
 import { getDefaultYouTubePrompt, getDefaultTextPrompt } from './prompt.js';
 
+// --- Global Variables ---
+let availableVoices = [];
+
 // Function to handle button press visual feedback
 function handleButtonPress(buttonId) {
   const button = document.getElementById(buttonId);
-  if (button) { // Check if button exists
+  if (button) {
     button.classList.add('button-pressed');
     setTimeout(() => {
       button.classList.remove('button-pressed');
@@ -41,28 +44,27 @@ const downloadLogBtn = document.getElementById('downloadLogBtn');
 // Load all settings from storage
 function loadSettings() {
   chrome.storage.sync.get([
-    "apiKey", "youtubePrompt", "textPrompt", "model", "maxTokens",
-    "temperature", "debug", "defaultVoice", "speechSpeed", "blockedSites"
+    "apiKey", "model", "maxTokens", "temperature", "debug",
+    "youtubePrompt", "textPrompt", "blockedSites",
+    "defaultVoice", "speechSpeed"
   ], (data) => {
-    // API & Model Config
-    apiKeyInput.value = data.apiKey || '';
-    modelInput.value = data.model || 'gpt-4o-mini';
-    maxTokensInput.value = data.maxTokens || 1000;
-    temperatureInput.value = data.temperature || 0.7;
-    debugCheckbox.checked = data.debug || false;
-
-    // Prompts
-    youtubePromptTextarea.value = data.youtubePrompt || getDefaultYouTubePrompt();
-    textPromptTextarea.value = data.textPrompt || getDefaultTextPrompt();
+    document.getElementById('apiKey').value = data.apiKey || "";
+    document.getElementById('model').value = data.model || "gpt-4o-mini";
+    document.getElementById('maxTokens').value = data.maxTokens || 1000;
+    document.getElementById('temperature').value = data.temperature || 0.7;
+    document.getElementById('debug').checked = data.debug || false;
+    document.getElementById('youtubePrompt').value = data.youtubePrompt || getDefaultYouTubePrompt();
+    document.getElementById('textPrompt').value = data.textPrompt || getDefaultTextPrompt();
 
     // Speech Settings
-    populateVoiceList(data.defaultVoice || '');
+    populateVoiceList(data.defaultVoice);
     const speed = data.speechSpeed || 100;
-    speechSpeedRange.value = speed;
-    speechSpeedValueSpan.textContent = `${speed}%`;
+    document.getElementById('speechSpeed').value = speed;
+    document.getElementById('speechSpeedValue').textContent = `${speed}%`;
 
-    // Blocker Sites
-    loadBlockedSitesList(data.blockedSites || []);
+    // Blocked Sites
+    const blockedSites = data.blockedSites || [];
+    updateBlockedSitesList(blockedSites);
   });
 }
 
@@ -70,21 +72,28 @@ function loadSettings() {
 function saveSettings(event) {
   event.preventDefault();
   handleButtonPress('saveSettingsBtn');
-  const settingsToSave = {
-    apiKey: apiKeyInput.value,
-    model: modelInput.value,
-    maxTokens: parseInt(maxTokensInput.value, 10),
-    temperature: parseFloat(temperatureInput.value),
-    debug: debugCheckbox.checked,
-    youtubePrompt: youtubePromptTextarea.value,
-    textPrompt: textPromptTextarea.value,
-    defaultVoice: defaultVoiceSelect.value,
-    speechSpeed: parseInt(speechSpeedRange.value, 10)
-  };
 
-  chrome.storage.sync.set(settingsToSave, () => {
-    alert('Settings saved.');
-    // Note: We don't save blockedSites here as it's managed separately
+  const apiKey = document.getElementById('apiKey').value;
+  const model = document.getElementById('model').value;
+  const maxTokens = parseInt(document.getElementById('maxTokens').value, 10);
+  const temperature = parseFloat(document.getElementById('temperature').value);
+  const debug = document.getElementById('debug').checked;
+  const youtubePrompt = document.getElementById('youtubePrompt').value;
+  const textPrompt = document.getElementById('textPrompt').value;
+  const defaultVoice = document.getElementById('defaultVoice').value;
+  const speechSpeed = document.getElementById('speechSpeed').value;
+
+  chrome.storage.sync.set({
+    apiKey, model, maxTokens, temperature, debug,
+    youtubePrompt, textPrompt, defaultVoice, speechSpeed
+  }, () => {
+    // Provide feedback (e.g., a temporary message)
+    const saveBtn = document.getElementById('saveSettingsBtn');
+    const originalText = saveBtn.textContent;
+    saveBtn.textContent = 'Saved!';
+    setTimeout(() => {
+      saveBtn.textContent = originalText;
+    }, 1500);
   });
 }
 
@@ -194,6 +203,52 @@ function downloadLog() {
   });
 }
 
+// --- NEW: Log Management Functions ---
+
+// Function to clear the debug log
+function clearLog() {
+    handleButtonPress('clearLogBtn');
+    if (confirm("Are you sure you want to clear the entire debug log?")) {
+        chrome.storage.local.set({ debugLog: "" }, () => {
+            if (chrome.runtime.lastError) {
+                console.error("Error clearing log:", chrome.runtime.lastError.message);
+                alert("Error clearing log: " + chrome.runtime.lastError.message);
+            } else {
+                alert("Debug log cleared successfully.");
+                // Optionally hide the log viewer if it's open
+                document.getElementById('logViewer').style.display = 'none';
+            }
+        });
+    }
+}
+
+// Function to view the debug log
+function viewLog() {
+    handleButtonPress('viewLogBtn');
+    const logViewer = document.getElementById('logViewer');
+    const logContent = document.getElementById('logContent');
+
+    chrome.storage.local.get(['debugLog'], (result) => {
+        if (chrome.runtime.lastError) {
+            console.error("Error retrieving log:", chrome.runtime.lastError.message);
+            logContent.textContent = "Error retrieving log: " + chrome.runtime.lastError.message;
+        } else {
+            const fullLog = result.debugLog || "Log is empty.";
+            const logLines = fullLog.trim().split('\n');
+            const recentLines = logLines.slice(-30).join('\n'); // Get last 30 lines
+            logContent.textContent = recentLines;
+        }
+        logViewer.style.display = 'block'; // Show the viewer
+        logContent.scrollTop = logContent.scrollHeight; // Scroll to bottom
+    });
+}
+
+// Function to close the log viewer
+function closeLogViewer() {
+    handleButtonPress('closeLogViewerBtn');
+    document.getElementById('logViewer').style.display = 'none';
+}
+
 // --- Event Listeners ---
 document.addEventListener('DOMContentLoaded', loadSettings); // Load all settings on page load
 if (saveSettingsBtn) {
@@ -209,3 +264,13 @@ newSiteOriginInput.addEventListener('keypress', (event) => { // Add site on Ente
   }
 });
 downloadLogBtn.addEventListener('click', downloadLog); // Download log button
+
+// Update speech speed display
+document.getElementById('speechSpeed').addEventListener('input', (event) => {
+  document.getElementById('speechSpeedValue').textContent = `${event.target.value}%`;
+});
+
+// NEW: Add listeners for log buttons
+document.getElementById('clearLogBtn').addEventListener('click', clearLog);
+document.getElementById('viewLogBtn').addEventListener('click', viewLog);
+document.getElementById('closeLogViewerBtn').addEventListener('click', closeLogViewer);
