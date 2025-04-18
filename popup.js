@@ -1,6 +1,13 @@
 // popup.js
 import { getDefaultYouTubePrompt, getDefaultTextPrompt } from './prompt.js';
 
+// Get references to buttons
+const summariseBtn = document.getElementById('summariseBtn');
+const blockSiteBtn = document.getElementById('blockSiteBtn');
+const optionsBtn = document.getElementById('optionsBtn');
+const copyTranscriptBtn = document.getElementById('copyTranscriptBtn');
+const popupTitle = document.getElementById('popupTitle'); // Get title element
+
 // Function to handle button press visual feedback
 function handleButtonPress(buttonId) {
   const button = document.getElementById(buttonId);
@@ -9,6 +16,30 @@ function handleButtonPress(buttonId) {
     button.classList.remove('button-pressed');
   }, 200); // Remove the class after 200ms
 }
+
+// --- Initialization on Popup Load ---
+function initializePopup() {
+  // Check current tab URL for YouTube
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const currentTab = tabs[0];
+    if (currentTab && currentTab.url && currentTab.url.includes('youtube.com/watch')) {
+      if (copyTranscriptBtn) {
+        copyTranscriptBtn.style.display = 'block'; // Show the button (use block for column layout)
+      }
+    }
+  });
+
+  // Get model name and update title
+  chrome.storage.sync.get(["model"], (data) => {
+    const model = data.model || "gpt-4o-mini"; // Default model
+    if (popupTitle) {
+      popupTitle.textContent = `Summarise Text with ${model}`;
+    }
+  });
+}
+
+// Run initialization
+initializePopup();
 
 document.getElementById('summariseBtn').addEventListener('click', async () => {
   handleButtonPress('summariseBtn'); // Add visual feedback
@@ -89,6 +120,68 @@ document.getElementById('optionsBtn').addEventListener('click', () => {
   handleButtonPress('optionsBtn'); // Add visual feedback
   chrome.runtime.openOptionsPage();
 });
+
+// Listener for the Copy Transcript button
+if (copyTranscriptBtn) {
+  copyTranscriptBtn.addEventListener('click', async () => {
+    handleButtonPress('copyTranscriptBtn');
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+      const currentTab = tabs[0];
+      if (currentTab && currentTab.id) {
+        try {
+          // Ensure necessary scripts are injected (might already be done by summarise)
+          await chrome.scripting.executeScript({
+            target: { tabId: currentTab.id },
+            files: ['youtubeTranscript.js']
+          });
+          // Request transcript and metadata from content script
+          chrome.tabs.sendMessage(currentTab.id, { action: "getTranscriptAndMetadata" }, (response) => {
+            if (chrome.runtime.lastError) {
+              console.error("Error sending message:", chrome.runtime.lastError.message);
+              copyTranscriptBtn.textContent = 'Error!';
+              setTimeout(() => copyTranscriptBtn.textContent = 'Copy Transcript', 2000);
+              return;
+            }
+            if (response && response.action === "transcriptData") {
+              const { transcript, title, channel, date, url } = response;
+              if (transcript) {
+                const wordCount = transcript.trim().split(/\s+/).length;
+                const header = `Title: ${title || 'N/A'}\nChannel: ${channel || 'N/A'}\nPublished: ${date || 'N/A'}\nURL: ${url || 'N/A'}\nWord Count: ${wordCount}\n\n---\n\n`;
+                const textToCopy = header + transcript;
+
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                  console.log('Transcript and metadata copied to clipboard.');
+                  copyTranscriptBtn.textContent = 'Copied!';
+                  setTimeout(() => copyTranscriptBtn.textContent = 'Copy Transcript', 2000);
+                }).catch(err => {
+                  console.error('Failed to copy transcript: ', err);
+                  copyTranscriptBtn.textContent = 'Copy Failed!';
+                  setTimeout(() => copyTranscriptBtn.textContent = 'Copy Transcript', 2000);
+                });
+              } else {
+                console.error('No transcript received from content script.');
+                copyTranscriptBtn.textContent = 'No Transcript!';
+                setTimeout(() => copyTranscriptBtn.textContent = 'Copy Transcript', 2000);
+              }
+            } else if (response && response.action === "transcriptError") {
+                 console.error("Error fetching transcript:", response.error);
+                 copyTranscriptBtn.textContent = 'Error!';
+                 setTimeout(() => copyTranscriptBtn.textContent = 'Copy Transcript', 2000);
+            } else {
+                console.error('Unexpected response from content script:', response);
+                copyTranscriptBtn.textContent = 'Error!';
+                setTimeout(() => copyTranscriptBtn.textContent = 'Copy Transcript', 2000);
+            }
+          });
+        } catch (error) {
+          console.error("Error during transcript copy process:", error);
+          copyTranscriptBtn.textContent = 'Error!';
+          setTimeout(() => copyTranscriptBtn.textContent = 'Copy Transcript', 2000);
+        }
+      }
+    });
+  });
+}
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "summariseText") {

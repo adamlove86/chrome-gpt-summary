@@ -4,20 +4,70 @@
     <meta charset="UTF-8">
     <title>Summarise Text</title>
     <style>
-        .button-pressed {
-            background-color: #d3d3d3; /* Light grey background */
-            border-style: inset; /* Gives a 'pressed' look */
+        body {
+            font-family: sans-serif;
+            padding: 10px 15px;
+            min-width: 200px; /* Prevent popup from being too small */
+            background-color: #f4f4f4;
+        }
+        h1 {
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            color: #333;
+            text-align: center;
+        }
+        .button-container {
+            display: flex;
+            flex-direction: column; /* Stack buttons vertically */
+            gap: 5px; /* Reduced space between buttons */
         }
         button {
-            margin-right: 5px; /* Add some space between buttons */
+            padding: 10px 12px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.95em;
+            text-align: left;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            color: white;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        button:active,
+        .button-pressed { /* Combine active and pressed styles */
+            transform: scale(0.98);
+            opacity: 1;
+            filter: brightness(90%);
+        }
+
+        /* Primary Button: Summarise */
+        #summariseBtn {
+            background-color: #007bff; /* Blue */
+        }
+
+        /* Secondary Buttons */
+        #blockSiteBtn {
+            background-color: #dc3545; /* Red */
+        }
+        #optionsBtn {
+            background-color: #6c757d; /* Grey */
+        }
+        #copyTranscriptBtn {
+            background-color: #28a745; /* Green */
+             /* Initially hidden - JS controls display */
+             /* display: none; - Handled by inline style */
         }
     </style>
 </head>
 <body>
-    <h1>Summarise Text</h1>
-    <button id="summariseBtn">Summarise Page</button>
-    <button id="blockSiteBtn">Block Paywall</button>
-    <button id="optionsBtn">Open Settings</button>
+    <h1 id="popupTitle">Summarise Text</h1>
+    <div class="button-container">
+        <button id="summariseBtn">📄 Summarise Page</button>
+        <button id="copyTranscriptBtn" style="display: none;">📋 Copy Transcript</button>
+        <button id="blockSiteBtn">🚫 Block Paywall Site</button>
+        <button id="optionsBtn">⚙️ Open Settings</button>
+    </div>
     <script type="module" src="popup.js"></script>
 </body>
 </html>

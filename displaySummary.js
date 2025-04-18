@@ -63,11 +63,15 @@
   const MAX_PREMATURE_STOP_RETRIES = 3; // Max retries per chunk
   let cancelInProgress = false; // Flag to prevent speaking while cancel() is processing
 
+  // Remove styleElement as we link instead
+  // let styleElement = null;
+  const sidebarStyleId = 'summary-sidebar-styles'; // ID for the link element
+
   // --- Initial Setup ---
   cleanupExistingSidebar();
+  injectStyles(); // Inject styles link first
   createSidebarUI();
-  applyTheme();
-  appendSidebar();
+  appendSidebar(); // This now also triggers applyTheme
   loadSummaryAndInit();
 
 
@@ -84,53 +88,47 @@
       } catch (e) { logEvent("Minor error cancelling speech during cleanup."); }
       existing.remove();
     }
+
+    // Remove the injected link element
+    const existingLink = document.getElementById(sidebarStyleId);
+    if (existingLink) {
+        existingLink.remove();
+        logEvent("Removed existing sidebar stylesheet link.");
+    }
+  }
+
+  function injectStyles() {
+      if (document.getElementById(sidebarStyleId)) {
+          logEvent("Sidebar stylesheet link already present.");
+          return;
+      }
+      const linkElement = document.createElement('link');
+      linkElement.id = sidebarStyleId;
+      linkElement.rel = 'stylesheet';
+      linkElement.type = 'text/css';
+      linkElement.href = chrome.runtime.getURL('sidebarStyles.css');
+
+      document.head.appendChild(linkElement);
+      logEvent("Sidebar CSS link injected into head: " + linkElement.href);
   }
 
   function createSidebarUI() {
       sidebar = document.createElement('div');
       sidebar.id = 'summary-sidebar';
-      // Apply styles...
-      sidebar.style.position = 'fixed';
-      sidebar.style.top = '0';
-      sidebar.style.right = '0';
-      sidebar.style.width = '400px';
-      sidebar.style.height = '100vh';
-      sidebar.style.backgroundColor = '#f9f9f9';
-      sidebar.style.borderLeft = '1px solid #ccc';
-      sidebar.style.zIndex = '2147483647';
-      sidebar.style.overflowY = 'auto';
-      sidebar.style.boxShadow = '-3px 0 8px rgba(0,0,0,0.15)';
-      sidebar.style.padding = '20px';
-      sidebar.style.boxSizing = 'border-box';
-      sidebar.style.fontFamily = 'Arial, sans-serif';
-      sidebar.style.fontSize = '16px';
-      sidebar.style.lineHeight = '1.5';
-      logEvent("Sidebar element created.");
+      // Styles are applied via linked CSS
+      logEvent("Sidebar element created (styles via CSS link).");
 
       // Close Button (Sidebar)
       closeButton = document.createElement('button');
       closeButton.innerText = '✕';
       closeButton.setAttribute('aria-label', 'Close Summary Sidebar');
-      // Apply styles...
-      closeButton.style.position = 'absolute';
-      closeButton.style.top = '10px';
-      closeButton.style.right = '10px';
-      closeButton.style.padding = '2px 8px';
-      closeButton.style.backgroundColor = '#e74c3c';
-      closeButton.style.color = '#fff';
-      closeButton.style.border = 'none';
-      closeButton.style.borderRadius = '50%';
-      closeButton.style.cursor = 'pointer';
-      closeButton.style.fontSize = '16px';
-      closeButton.style.lineHeight = '1';
-      closeButton.style.fontWeight = 'bold';
+      closeButton.id = 'summary-sidebar-close-btn';
       closeButton.addEventListener('click', handleCloseSidebar);
       sidebar.appendChild(closeButton);
 
-      // Summary Content Container (APPENDED LATER in loadSummaryAndInit)
+      // Summary Content Container
       summaryContainer = document.createElement('div');
       summaryContainer.id = 'summary-container';
-      summaryContainer.style.marginTop = '10px'; // Adjust spacing as needed
   }
 
   function appendSidebar() {
@@ -168,52 +166,35 @@
         // Add Title
         const titleElement = document.createElement('h1');
         titleElement.textContent = `${pageTitle} - Summary`;
-        // Apply styles...
-        titleElement.style.fontSize = '22px';
-        titleElement.style.marginBottom = '15px';
-        titleElement.style.marginTop = '30px'; // Space below close button
-        titleElement.style.color = '#333';
-        sidebar.appendChild(titleElement); // Append title
+        titleElement.id = 'summary-sidebar-title';
+        sidebar.appendChild(titleElement);
 
         // Add Info
         const infoElement = document.createElement('div');
-        // Apply styles...
-        infoElement.style.fontSize = '13px';
-        infoElement.style.marginBottom = '20px';
-        infoElement.style.color = '#555';
+        infoElement.id = 'summary-sidebar-info';
         infoElement.innerHTML = `
-          <p style="margin: 5px 0;"><strong>Published:</strong> ${formatDate(publishedDate)}</p>
-          <p style="margin: 5px 0;"><strong>Original Length:</strong> ${wordCount} words</p>
-          <p style="margin: 5px 0;"><strong>Original Page:</strong> <a href="${pageUrl}" target="_blank" style="color: #007bff; word-break: break-all;">${pageUrl}</a></p>
+          <p><strong>Published:</strong> ${formatDate(publishedDate)}</p>
+          <p><strong>Original Length:</strong> ${wordCount} words</p>
+          <p><strong>Original Page:</strong> <a href="${pageUrl}" target="_blank">${pageUrl}</a></p>
         `;
-        sidebar.appendChild(infoElement); // Append info
+        sidebar.appendChild(infoElement);
 
         // Add "Open TTS" button
         openTTSButton = document.createElement('button');
         openTTSButton.innerText = '🔊 Read Summary';
         openTTSButton.setAttribute('aria-label', 'Open Text-to-Speech Controls');
-        // Apply styles...
-        openTTSButton.style.display = 'block';
-        openTTSButton.style.marginBottom = '15px';
-        openTTSButton.style.padding = '8px 12px';
-        openTTSButton.style.cursor = 'pointer';
-        openTTSButton.style.backgroundColor = '#3498db';
-        openTTSButton.style.color = 'white';
-        openTTSButton.style.border = 'none';
-        openTTSButton.style.borderRadius = '4px';
-        openTTSButton.style.fontSize = '14px';
+        openTTSButton.id = 'summary-sidebar-open-tts-btn';
         openTTSButton.addEventListener('click', () => {
             if(ttsContainer) ttsContainer.style.display = 'block';
             if (openTTSButton) openTTSButton.style.display = 'none';
             logEvent("TTS container displayed, attempting to autoplay.");
-            // Attempt to start playback automatically
             if (typeof handlePlay === 'function') {
                 handlePlay();
             } else {
                 logEvent("Error: handlePlay function not found for autoplay.");
             }
         });
-        sidebar.appendChild(openTTSButton); // Append button
+        sidebar.appendChild(openTTSButton);
 
         // --- Create TTS Controls HERE, BEFORE summary content ---
         createAndAppendTTSControls();
@@ -1171,9 +1152,12 @@
         logEvent(">>> Close Sidebar button clicked <<<");
         handleStop(); // Stop TTS
         if(sidebar) sidebar.remove();
-        // Remove injected styles
-        const styleElement = document.getElementById('tts-highlight-style');
-        if (styleElement) styleElement.remove();
+        // Remove injected stylesheet link
+        const styleLink = document.getElementById(sidebarStyleId); 
+        if (styleLink) {
+             styleLink.remove();
+             logEvent("Removed sidebar stylesheet link from head.");
+        }
    }
 
   // NEW: Handler for Previous Chunk button

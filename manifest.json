@@ -43,7 +43,8 @@
         "key.txt",
         "displaySummary.js",
         "displayError.js",
-        "youtubeTranscript.js"
+        "youtubeTranscript.js",
+        "sidebarStyles.css"
       ],
       "matches": ["<all_urls>"]
     }

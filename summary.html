@@ -11,6 +11,9 @@
       max-width: 800px;
       margin: auto;
       font-size: 16px; /* Set base font size */
+      /* Default light mode colors (can be adjusted) */
+      background-color: #ffffff;
+      color: #333333;
     }
     h1 {
       font-size: 24px; /* Fixed font size */
@@ -60,31 +63,347 @@
       background-color: #d3d3d3; /* Light grey background */
       border-style: inset; /* Gives a 'pressed' look */
     }
+
+    /* Dark Mode Styles */
+    @media (prefers-color-scheme: dark) {
+      body {
+        background-color: #1e1e1e; /* Dark background */
+        color: #e0e0e0; /* Light text */
+      }
+      h1, h2, h3 {
+        color: #ffffff; /* Brighter headers in dark mode */
+      }
+      strong {
+        color: #a9c7e0; /* Adjusted strong color for dark bg */
+      }
+      .red { color: #ff7b7b; } /* Lighter red */
+      .blue { color: #87cefa; } /* Lighter blue */
+      .green { color: #90ee90; } /* Lighter green */
+      .orange { color: #ffd700; } /* Lighter orange (gold) */
+      .footer {
+        color: #aaaaaa; /* Lighter grey footer text */
+      }
+      .footer a {
+        color: #87cefa; /* Lighter blue links */
+      }
+      #ttsControls select, #ttsControls button, #ttsControls input[type="range"] {
+        background-color: #333333;
+        color: #e0e0e0;
+        border: 1px solid #555555;
+      }
+      .button-pressed {
+        background-color: #555555;
+        border-color: #777777;
+      }
+    }
+
+    /* Base styles for sidebar container injected by displaySummary.js */
+    #summary-sidebar {
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: 400px;
+        height: 100vh;
+        background-color: #f9f9f9; /* Light mode default */
+        border-left: 1px solid #ccc;
+        z-index: 2147483647;
+        overflow-y: auto;
+        box-shadow: -3px 0 8px rgba(0,0,0,0.15);
+        padding: 20px;
+        box-sizing: border-box;
+        font-family: Arial, sans-serif;
+        font-size: 16px;
+        line-height: 1.5;
+        color: #333333; /* Light mode default text */
+    }
+
+    #summary-sidebar h1#summary-sidebar-title {
+        font-size: 22px;
+        margin-bottom: 15px;
+        margin-top: 30px; /* Space below close button */
+        color: #333;
+        font-weight: bold;
+    }
+
+    #summary-sidebar div#summary-sidebar-info {
+        font-size: 13px;
+        margin-bottom: 20px;
+        color: #555;
+    }
+    #summary-sidebar div#summary-sidebar-info p {
+        margin: 5px 0;
+    }
+    #summary-sidebar div#summary-sidebar-info a {
+        color: #007bff;
+        word-break: break-all;
+        text-decoration: none;
+    }
+    #summary-sidebar div#summary-sidebar-info a:hover {
+        text-decoration: underline;
+    }
+
+    #summary-sidebar button#summary-sidebar-close-btn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        padding: 2px 8px;
+        background-color: #e74c3c;
+        color: #fff;
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 16px;
+        line-height: 1;
+        font-weight: bold;
+    }
+    #summary-sidebar button#summary-sidebar-close-btn:hover {
+        background-color: #c0392b;
+    }
+
+    #summary-sidebar button#summary-sidebar-open-tts-btn {
+        display: block;
+        margin-bottom: 15px;
+        padding: 8px 12px;
+        cursor: pointer;
+        background-color: #3498db;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+    #summary-sidebar button#summary-sidebar-open-tts-btn:hover {
+        background-color: #2980b9;
+    }
+
+    /* Styles for main summary content area */
+    #summary-sidebar #summary-container {
+        margin-top: 10px;
+    }
+    #summary-sidebar #summary-container h1, /* For markdown h1 */
+    #summary-sidebar #summary-container h2,
+    #summary-sidebar #summary-container h3,
+    #summary-sidebar #summary-container h4 {
+        margin-top: 1em;
+        margin-bottom: 0.5em;
+        font-weight: bold;
+    }
+    #summary-sidebar #summary-container h1 { font-size: 1.6em; }
+    #summary-sidebar #summary-container h2 { font-size: 1.4em; }
+    #summary-sidebar #summary-container h3 { font-size: 1.2em; }
+    #summary-sidebar #summary-container h4 { font-size: 1.0em; }
+    #summary-sidebar #summary-container p {
+        margin-bottom: 1em;
+    }
+    #summary-sidebar #summary-container ul,
+    #summary-sidebar #summary-container ol {
+        margin-left: 20px;
+        margin-bottom: 1em;
+    }
+    #summary-sidebar #summary-container li {
+        margin-bottom: 0.5em;
+    }
+    #summary-sidebar #summary-container strong { color: #34495e; font-weight: bold; }
+    #summary-sidebar #summary-container em { font-style: italic; }
+    #summary-sidebar #summary-container code {
+        background-color: #eee;
+        padding: 0.2em 0.4em;
+        border-radius: 3px;
+        font-family: monospace;
+    }
+    #summary-sidebar #summary-container pre {
+        background-color: #eee;
+        padding: 10px;
+        border-radius: 4px;
+        overflow-x: auto;
+        margin-bottom: 1em;
+    }
+    #summary-sidebar #summary-container pre code {
+        background-color: transparent;
+        padding: 0;
+    }
+
+    /* Styles for TTS controls container */
+    #summary-sidebar #tts-controls {
+        margin-top: 0px;
+        margin-bottom: 20px;
+        padding: 15px;
+        border-top: 1px solid #ccc;
+        border-bottom: 1px solid #ccc;
+        background-color: #eee;
+        border-radius: 4px;
+    }
+
+    /* Base styles for TTS buttons/controls */
+    #summary-sidebar #tts-controls button,
+    #summary-sidebar #tts-controls select,
+    #summary-sidebar #tts-controls input[type="range"] {
+        margin-right: 8px;
+        margin-bottom: 8px;
+        padding: 6px 10px;
+        font-size: 13px;
+        cursor: pointer;
+        border-radius: 3px;
+        border: 1px solid #ccc;
+    }
+    #summary-sidebar #tts-controls label {
+        margin-right: 5px;
+        font-size: 13px;
+    }
+    #summary-sidebar #tts-controls span#tts-speed-display {
+        margin-left: 5px;
+        font-size: 13px;
+        display: inline-block;
+        min-width: 35px;
+    }
+    #summary-sidebar #tts-controls input[type="range"] {
+        vertical-align: middle;
+        max-width: 100px;
+    }
+    #summary-sidebar #tts-controls select#tts-voice-select {
+         max-width: 180px;
+         overflow: hidden;
+         text-overflow: ellipsis;
+    }
+    #summary-sidebar #tts-controls button#summary-sidebar-close-tts-btn {
+        float: right; /* Keep float */
+        background-color: #f1f1f1;
+    }
+
+    /* Specific TTS button colors (Light mode) */
+    #summary-sidebar #tts-controls button[aria-label="Previous Sentence"],
+    #summary-sidebar #tts-controls button[aria-label="Next Sentence"] {
+        background-color: #95a5a6; color: white; border-color: #95a5a6; margin-right: 15px; margin-left: 0;
+    }
+     #summary-sidebar #tts-controls button[aria-label="Next Sentence"] { margin-left: 15px; margin-right: 0; }
+    #summary-sidebar #tts-controls button[aria-label="Play Summary"] { background-color: #2ecc71; color: white; border-color: #2ecc71; }
+    #summary-sidebar #tts-controls button[aria-label="Pause Summary"] { background-color: #f39c12; color: white; border-color: #f39c12; }
+    #summary-sidebar #tts-controls button[aria-label="Resume Summary"] { background-color: #3498db; color: white; border-color: #3498db; }
+    #summary-sidebar #tts-controls button[aria-label="Stop Summary"] { background-color: #e74c3c; color: white; border-color: #e74c3c; }
+
+    /* Pressed button style (Works for both modes?) */
+    #summary-sidebar .button-pressed {
+        background-color: #d3d3d3; /* Light grey background */
+        border-style: inset; /* Gives a 'pressed' look */
+    }
+
+    /* --- Dark Mode Styles --- */
+    /* Apply dark mode styles when the .dark-mode class is present on the sidebar */
+    #summary-sidebar.dark-mode {
+      background-color: #1e1e1e; /* Dark background */
+      color: #e0e0e0; /* Light text */
+      border-left: 1px solid #555;
+    }
+    /* General text elements */
+    #summary-sidebar.dark-mode h1#summary-sidebar-title,
+    #summary-sidebar.dark-mode #summary-container h1,
+    #summary-sidebar.dark-mode #summary-container h2,
+    #summary-sidebar.dark-mode #summary-container h3,
+    #summary-sidebar.dark-mode #summary-container h4 {
+      color: #ffffff; /* Brighter headers */
+    }
+    #summary-sidebar.dark-mode div#summary-sidebar-info,
+    #summary-sidebar.dark-mode #summary-container p,
+    #summary-sidebar.dark-mode #summary-container span,
+    #summary-sidebar.dark-mode #summary-container li,
+    #summary-sidebar.dark-mode #tts-controls label {
+      color: #e0e0e0;
+    }
+    #summary-sidebar.dark-mode strong {
+      color: #f0f0f0; /* Brighter strong text */
+    }
+    #summary-sidebar.dark-mode a {
+      color: #87cefa; /* Lighter blue links */
+    }
+    #summary-sidebar.dark-mode div#summary-sidebar-info a {
+      color: #87cefa;
+    }
+    #summary-sidebar.dark-mode a:visited {
+      color: #ce93d8; /* Lighter purple */
+    }
+
+    /* Code blocks */
+    #summary-sidebar.dark-mode #summary-container code {
+        background-color: #333;
+        color: #eee;
+    }
+    #summary-sidebar.dark-mode #summary-container pre {
+        background-color: #2a2a2a;
+        border: 1px solid #444;
+    }
+     #summary-sidebar.dark-mode #summary-container pre code {
+        background-color: transparent;
+        color: #eee;
+    }
+
+    /* Buttons */
+    #summary-sidebar.dark-mode button {
+        background-color: #4a4a4a;
+        color: #e0e0e0;
+        border: 1px solid #666;
+    }
+    #summary-sidebar.dark-mode button:hover {
+        background-color: #5a5a5a;
+    }
+    /* Specific Button Overrides */
+    #summary-sidebar.dark-mode button#summary-sidebar-close-btn {
+        background-color: #7c2c2c; /* Darker Red */
+        color: #f0f0f0;
+        border: none;
+    }
+    #summary-sidebar.dark-mode button#summary-sidebar-close-btn:hover { background-color: #6b2525; }
+
+    #summary-sidebar.dark-mode button#summary-sidebar-open-tts-btn {
+        background-color: #2a68a1; /* Darker Blue */
+        color: #f0f0f0;
+        border: none;
+    }
+    #summary-sidebar.dark-mode button#summary-sidebar-open-tts-btn:hover { background-color: #245a8a; }
+
+    /* TTS Controls Area */
+    #summary-sidebar.dark-mode #tts-controls {
+      background-color: #2f2f2f;
+      border-top: 1px solid #555;
+      border-bottom: 1px solid #555;
+    }
+    #summary-sidebar.dark-mode #tts-controls select,
+    #summary-sidebar.dark-mode #tts-controls input[type="range"] {
+        background-color: #444;
+        color: #e0e0e0;
+        border: 1px solid #666;
+    }
+    #summary-sidebar.dark-mode #tts-controls button#summary-sidebar-close-tts-btn {
+        background-color: #5a5a5a;
+    }
+    #summary-sidebar.dark-mode #tts-controls button#summary-sidebar-close-tts-btn:hover {
+        background-color: #6a6a6a;
+    }
+
+    /* Specific TTS Button Colors */
+    #summary-sidebar.dark-mode #tts-controls button[aria-label="Previous Sentence"],
+    #summary-sidebar.dark-mode #tts-controls button[aria-label="Next Sentence"] {
+       background-color: #6c7a7b; border-color: #6c7a7b; color: #e0e0e0;
+    }
+    #summary-sidebar.dark-mode #tts-controls button[aria-label="Play Summary"] { background-color: #24804d; border-color: #24804d; color: #f0f0f0; }
+    #summary-sidebar.dark-mode #tts-controls button[aria-label="Pause Summary"] { background-color: #a86c0d; border-color: #a86c0d; color: #f0f0f0; }
+    #summary-sidebar.dark-mode #tts-controls button[aria-label="Resume Summary"] { background-color: #256a9e; border-color: #256a9e; color: #f0f0f0; }
+    #summary-sidebar.dark-mode #tts-controls button[aria-label="Stop Summary"] { background-color: #9c3428; border-color: #9c3428; color: #f0f0f0; }
+
+    #summary-sidebar.dark-mode .button-pressed {
+        background-color: #666; /* Darker grey */
+        border-color: #888;
+    }
+
   </style>
 </head>
 <body>
+  <!-- Content below is placeholder; displaySummary.js injects the actual sidebar -->
+  <!--
   <h1 id="summaryTitle"></h1>
   <div id="summaryInfo"></div>
   <div id="summaryContent">Loading summary...</div>
-
-  <!-- TTS Controls -->
-  <div id="ttsControls">
-    <label for="voiceDropdown">Choose Voice:</label>
-    <select id="voiceDropdown"></select>
-
-    <label for="speechSpeedSlider">Speech Speed (%):</label>
-    <input type="range" id="speechSpeedSlider" min="50" max="150" value="100">
-    <span id="speechSpeedDisplay">100%</span>
-
-    <button id="playButton" aria-label="Play Summary">▶ Play</button>
-    <button id="pauseButton" aria-label="Pause Summary">❚❚ Pause</button>
-    <button id="resumeButton" aria-label="Resume Summary">► Resume</button>
-    <button id="stopButton" aria-label="Stop Summary">■ Stop</button>
-  </div>
-
-  <div class="footer">
-    <p>Original page: <a id="pageUrl" href="#" target="_blank"></a></p>
-  </div>
-  <script src="summary.js"></script>
+  <div id="ttsControls"></div>
+  <div class="footer"></div>
+  -->
+  <script src="summary.js"></script> <!-- summary.js might not be needed anymore? -->
 </body>
 </html>
