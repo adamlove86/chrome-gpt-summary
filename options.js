@@ -43,11 +43,19 @@ const downloadLogBtn = document.getElementById('downloadLogBtn');
 
 // Load all settings from storage
 function loadSettings() {
-  chrome.storage.sync.get([
-    "apiKey", "model", "maxTokens", "temperature", "debug",
-    "youtubePrompt", "textPrompt", "blockedSites",
-    "defaultVoice", "speechSpeed"
-  ], (data) => {
+  chrome.storage.sync.get({
+    apiKey: '',
+    model: 'gpt-4o-mini',
+    maxTokens: 1000,
+    temperature: 0.7,
+    debug: false,
+    youtubePrompt: getDefaultYouTubePrompt(),
+    textPrompt: getDefaultTextPrompt(),
+    defaultVoice: '', // Will be populated by populateVoiceList
+    speechSpeed: 100,
+    blockedSites: [],
+    logLineLimit: 30 // Keep the new log line limit setting
+  }, (data) => {
     document.getElementById('apiKey').value = data.apiKey || "";
     document.getElementById('model').value = data.model || "gpt-4o-mini";
     document.getElementById('maxTokens').value = data.maxTokens || 1000;
@@ -55,16 +63,15 @@ function loadSettings() {
     document.getElementById('debug').checked = data.debug || false;
     document.getElementById('youtubePrompt').value = data.youtubePrompt || getDefaultYouTubePrompt();
     document.getElementById('textPrompt').value = data.textPrompt || getDefaultTextPrompt();
+    document.getElementById('speechSpeed').value = data.speechSpeed || 100;
+    document.getElementById('speechSpeedValue').textContent = `${data.speechSpeed || 100}%`;
+    document.getElementById('logLineLimit').value = data.logLineLimit || 30;
 
-    // Speech Settings
+    // Populate voices and set default after voices are loaded
     populateVoiceList(data.defaultVoice);
-    const speed = data.speechSpeed || 100;
-    document.getElementById('speechSpeed').value = speed;
-    document.getElementById('speechSpeedValue').textContent = `${speed}%`;
 
-    // Blocked Sites
-    const blockedSites = data.blockedSites || [];
-    updateBlockedSitesList(blockedSites);
+    // Load blocked sites
+    loadBlockedSitesList(data.blockedSites);
   });
 }
 
@@ -75,19 +82,29 @@ function saveSettings(event) {
 
   const apiKey = document.getElementById('apiKey').value;
   const model = document.getElementById('model').value;
-  const maxTokens = parseInt(document.getElementById('maxTokens').value, 10);
-  const temperature = parseFloat(document.getElementById('temperature').value);
+  const maxTokens = parseInt(document.getElementById('maxTokens').value, 10) || 1000;
+  const temperature = parseFloat(document.getElementById('temperature').value) || 0.7;
   const debug = document.getElementById('debug').checked;
   const youtubePrompt = document.getElementById('youtubePrompt').value;
   const textPrompt = document.getElementById('textPrompt').value;
   const defaultVoice = document.getElementById('defaultVoice').value;
-  const speechSpeed = document.getElementById('speechSpeed').value;
+  const speechSpeed = parseInt(document.getElementById('speechSpeed').value, 10) || 100;
+  const logLineLimit = parseInt(document.getElementById('logLineLimit').value, 10) || 30; // Keep log line limit
 
   chrome.storage.sync.set({
-    apiKey, model, maxTokens, temperature, debug,
-    youtubePrompt, textPrompt, defaultVoice, speechSpeed
+    apiKey: apiKey,
+    model: model,
+    maxTokens: maxTokens,
+    temperature: temperature,
+    debug: debug,
+    youtubePrompt: youtubePrompt,
+    textPrompt: textPrompt,
+    defaultVoice: defaultVoice,
+    speechSpeed: speechSpeed,
+    logLineLimit: logLineLimit // Save log line limit
+    // Blocked sites are saved separately by addSite/removeSite
   }, () => {
-    // Provide feedback (e.g., a temporary message)
+    // Provide feedback
     const saveBtn = document.getElementById('saveSettingsBtn');
     const originalText = saveBtn.textContent;
     saveBtn.textContent = 'Saved!';
@@ -225,21 +242,20 @@ function clearLog() {
 // Function to view the debug log
 function viewLog() {
     handleButtonPress('viewLogBtn');
-    const logViewer = document.getElementById('logViewer');
-    const logContent = document.getElementById('logContent');
+    chrome.storage.local.get(['debugLog'], function(result) {
+        const logViewer = document.getElementById('logViewer');
+        const logContent = document.getElementById('logContent');
+        const logLineLimit = parseInt(document.getElementById('logLineLimit').value) || 30;
+        document.getElementById('logLinesShown').textContent = `Last ${logLineLimit} lines`;
 
-    chrome.storage.local.get(['debugLog'], (result) => {
-        if (chrome.runtime.lastError) {
-            console.error("Error retrieving log:", chrome.runtime.lastError.message);
-            logContent.textContent = "Error retrieving log: " + chrome.runtime.lastError.message;
+        if (result.debugLog) {
+            const lines = result.debugLog.split('\n');
+            const lastLines = lines.slice(-logLineLimit).join('\n');
+            logContent.textContent = lastLines;
         } else {
-            const fullLog = result.debugLog || "Log is empty.";
-            const logLines = fullLog.trim().split('\n');
-            const recentLines = logLines.slice(-30).join('\n'); // Get last 30 lines
-            logContent.textContent = recentLines;
+            logContent.textContent = 'No logs found.';
         }
-        logViewer.style.display = 'block'; // Show the viewer
-        logContent.scrollTop = logContent.scrollHeight; // Scroll to bottom
+        logViewer.style.display = 'block';
     });
 }
 

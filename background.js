@@ -5,11 +5,29 @@ import { getDefaultYouTubePrompt, getDefaultTextPrompt } from './prompt.js';
 
 // Append a message with timestamp to the persistent debug log in local storage
 function appendLog(message) {
-  const timestamp = new Date().toISOString();
+  // Get local date and time components
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = (now.getMonth() + 1).toString().padStart(2, '0'); // Month is 0-indexed
+  const day = now.getDate().toString().padStart(2, '0');
+  const hours = now.getHours().toString().padStart(2, '0');
+  const minutes = now.getMinutes().toString().padStart(2, '0');
+  const seconds = now.getSeconds().toString().padStart(2, '0');
+  const milliseconds = now.getMilliseconds().toString().padStart(3, '0');
+
+  // Construct a consistent local timestamp string (YYYY-MM-DD HH:MM:SS.ms)
+  const timestamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}`;
+
   const logMessage = `${timestamp} - ${message}\n`;
   chrome.storage.local.get(['debugLog'], (result) => {
     let debugLog = result.debugLog || "";
     debugLog += logMessage;
+    // Limit log size to prevent excessive storage use (e.g., last ~1000 lines)
+    const lines = debugLog.split('\n');
+    const maxLogLines = 1000;
+    if (lines.length > maxLogLines) {
+      debugLog = lines.slice(-maxLogLines).join('\n');
+    }
     chrome.storage.local.set({ debugLog });
   });
 }
@@ -160,7 +178,10 @@ async function summariseText(text, pageUrl, contentType, pageTitle, publishedDat
         body: JSON.stringify({
           model: model,
           messages: [
-            { "role": "system", "content": "You are a helpful assistant." },
+            { 
+              "role": "system", 
+              "content": "You are a helpful assistant that creates well-formatted summaries. Always use proper markdown formatting including **bold** for important terms, *italics* for emphasis and headings, and proper line breaks between paragraphs and sections. Ensure your response maintains clear visual structure with proper spacing." 
+            },
             { "role": "user", "content": `${prompt}\n\n${text}` }
           ],
           max_tokens: maxTokens,

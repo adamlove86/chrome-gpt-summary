@@ -143,76 +143,116 @@
   }
 
   function loadSummaryAndInit() {
-    chrome.storage.local.get(
-      ['latestSummary', 'summaryPageUrl', 'pageTitle', 'publishedDate', 'wordCount'],
-      (data) => {
-        if (chrome.runtime.lastError) {
-             logEvent(`Error retrieving summary data: ${chrome.runtime.lastError.message}`);
-             if (summaryContainer) summaryContainer.innerHTML = `<p style="color: red;">Error loading summary data.</p>`;
-             // Append summary container if it wasn't already
-             if (sidebar && !sidebar.contains(summaryContainer)) {
-                 sidebar.appendChild(summaryContainer);
-             }
-             return;
-        }
+    const maxRetries = 5;
+    let retryCount = 0;
 
-        logEvent("Retrieved summary data from storage.");
-        const summary = data.latestSummary || 'No summary available.';
-        const pageUrl = data.summaryPageUrl || '#';
-        const pageTitle = data.pageTitle || 'Summary';
-        const publishedDate = data.publishedDate || 'Unknown';
-        const wordCount = data.wordCount || 'Unknown';
+    function tryLoadSummary() {
+      chrome.storage.local.get(
+        ['latestSummary', 'summaryPageUrl', 'pageTitle', 'publishedDate', 'wordCount'],
+        (data) => {
+          if (chrome.runtime.lastError) {
+            logEvent(`Error retrieving summary data: ${chrome.runtime.lastError.message}`);
+            handleLoadError();
+            return;
+          }
 
-        // Add Title
-        const titleElement = document.createElement('h1');
-        titleElement.textContent = `${pageTitle} - Summary`;
-        titleElement.id = 'summary-sidebar-title';
-        sidebar.appendChild(titleElement);
-
-        // Add Info
-        const infoElement = document.createElement('div');
-        infoElement.id = 'summary-sidebar-info';
-        infoElement.innerHTML = `
-          <p><strong>Published:</strong> ${formatDate(publishedDate)}</p>
-          <p><strong>Original Length:</strong> ${wordCount} words</p>
-          <p><strong>Original Page:</strong> <a href="${pageUrl}" target="_blank">${pageUrl}</a></p>
-        `;
-        sidebar.appendChild(infoElement);
-
-        // Add "Open TTS" button
-        openTTSButton = document.createElement('button');
-        openTTSButton.innerText = '🔊 Read Summary';
-        openTTSButton.setAttribute('aria-label', 'Open Text-to-Speech Controls');
-        openTTSButton.id = 'summary-sidebar-open-tts-btn';
-        openTTSButton.addEventListener('click', () => {
-            if(ttsContainer) ttsContainer.style.display = 'block';
-            if (openTTSButton) openTTSButton.style.display = 'none';
-            logEvent("TTS container displayed, attempting to autoplay.");
-            if (typeof handlePlay === 'function') {
-                handlePlay();
+          // Check if we have a valid summary
+          if (!data.latestSummary || data.latestSummary === 'No summary available.') {
+            if (retryCount < maxRetries) {
+              retryCount++;
+              logEvent(`No summary available yet, retrying in 1 second (attempt ${retryCount}/${maxRetries})...`);
+              setTimeout(tryLoadSummary, 1000);
+              return;
             } else {
-                logEvent("Error: handlePlay function not found for autoplay.");
+              logEvent("Max retries reached, showing error state");
+              handleLoadError();
+              return;
             }
-        });
-        sidebar.appendChild(openTTSButton);
+          }
 
-        // --- Create TTS Controls HERE, BEFORE summary content ---
-        createAndAppendTTSControls();
+          logEvent("Retrieved summary data from storage.");
+          const summary = data.latestSummary;
+          const pageUrl = data.summaryPageUrl || '#';
+          const pageTitle = data.pageTitle || 'Summary';
+          const publishedDate = data.publishedDate || 'Unknown';
+          const wordCount = data.wordCount || 'Unknown';
 
-        // --- Append Summary Content AFTER TTS controls ---
-        const textForChunks = getTextToReadFromSummary(summary); // Get raw text first
-        currentChunks = splitIntoChunks(textForChunks); // Split text into chunks based on the logic
-        summaryContainer.innerHTML = convertTextChunksToHtml(currentChunks); // Convert chunks to HTML spans
-        sidebar.appendChild(summaryContainer); // Now append summary container
-        logEvent("Summary content added with spans. Chunks: " + currentChunks.length);
+          // Add Title
+          const titleElement = document.createElement('h1');
+          titleElement.textContent = `${pageTitle} - Summary`;
+          titleElement.id = 'summary-sidebar-title';
+          sidebar.appendChild(titleElement);
 
-        // Inject highlight styles
-        addHighlightStyles();
+          // Add Info
+          const infoElement = document.createElement('div');
+          infoElement.id = 'summary-sidebar-info';
+          infoElement.innerHTML = `
+            <p><strong>Published:</strong> ${formatDate(publishedDate)}</p>
+            <p><strong>Original Length:</strong> ${wordCount} words</p>
+            <p><strong>Original Page:</strong> <a href="${pageUrl}" target="_blank">${pageUrl}</a></p>
+          `;
+          sidebar.appendChild(infoElement);
 
-        // Initialize TTS Logic
-        initializeTTS();
+          // Add "Open TTS" button
+          openTTSButton = document.createElement('button');
+          openTTSButton.innerText = '🔊 Read Summary';
+          openTTSButton.setAttribute('aria-label', 'Open Text-to-Speech Controls');
+          openTTSButton.id = 'summary-sidebar-open-tts-btn';
+          openTTSButton.addEventListener('click', () => {
+              if(ttsContainer) ttsContainer.style.display = 'block';
+              if (openTTSButton) openTTSButton.style.display = 'none';
+              logEvent("TTS container displayed, attempting to autoplay.");
+              if (typeof handlePlay === 'function') {
+                  handlePlay();
+              } else {
+                  logEvent("Error: handlePlay function not found for autoplay.");
+              }
+          });
+          sidebar.appendChild(openTTSButton);
+
+          // Create TTS Controls
+          createAndAppendTTSControls();
+
+          // Append Summary Content
+          const formattedHtml = convertMarkdownToHtml(summary);
+          summaryContainer.innerHTML = formattedHtml;
+          sidebar.appendChild(summaryContainer); // Now append summary container
+          logEvent("Summary content added with formatted HTML.");
+
+          // Inject highlight styles
+          addHighlightStyles();
+
+          // Initialize TTS Logic (uses the original summary text for processing)
+          const textForChunks = getTextToReadFromSummary(summary);
+          currentChunks = splitIntoChunks(textForChunks);
+          logEvent("Prepared TTS chunks from original summary. Chunks: " + currentChunks.length);
+          initializeTTS();
+        }
+      );
+    }
+
+    function handleLoadError() {
+      if (summaryContainer) {
+        summaryContainer.innerHTML = `
+          <div style="text-align: center; padding: 20px;">
+            <p style="color: #e74c3c; margin-bottom: 15px;">Unable to load summary at this time.</p>
+            <p>This could be because:</p>
+            <ul style="text-align: left; margin: 10px 0;">
+              <li>The summary is still being generated</li>
+              <li>There was an error in the summarization process</li>
+              <li>The content could not be processed</li>
+            </ul>
+            <p style="margin-top: 15px;">Please try again in a moment.</p>
+          </div>
+        `;
       }
-    );
+      if (sidebar && !sidebar.contains(summaryContainer)) {
+        sidebar.appendChild(summaryContainer);
+      }
+    }
+
+    // Start the loading process
+    tryLoadSummary();
   }
 
   function createAndAppendTTSControls() {
@@ -306,27 +346,88 @@
     }
   }
   function convertMarkdownToHtml(markdown) {
-    // Basic Markdown to HTML conversion (same as before)
-    // ... (keep existing conversion logic, but we'll replace its usage)
-    // THIS FUNCTION IS NO LONGER THE PRIMARY WAY TO RENDER THE SUMMARY for TTS
-    // We now use convertTextChunksToHtml for the main summary content.
-    // Keep this function in case it's used elsewhere or for non-TTS display.
-    logEvent("convertMarkdownToHtml called (potentially legacy usage).");
-    let html = markdown
-        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-        .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-        .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>') // Bold
-        .replace(/\*(.*?)\*/gim, '<em>$1</em>')       // Italic
-        .replace(/`([^`]+)`/gim, '<code>$1</code>')   // Inline code
-        .replace(/\[([^\]]+)\]\(([^)]+)\)/gim, '<a href="$2" target="_blank">$1</a>') // Links
-        .replace(/^\s*[-*+]\s+(.*)/gim, '<li>$1</li>') // List items
-        .replace(/<\/li>\s*<li>/gim, '</li><li>')      // Fix list spacing
-        .replace(/(<li>.*<\/li>)/gim, '<ul>$1</ul>')   // Wrap lists
-        .replace(/<\/ul>\s*<ul>/gim, '')               // Merge adjacent lists
-        .replace(/\n/g, '<br>');                       // Paragraphs/line breaks
+    if (!markdown) return '';
+    logEvent("Converting markdown to HTML for display...");
 
-    return html;
+    // Basic handling of paragraphs (split by double newline)
+    const paragraphs = markdown.split(/\n\s*\n+/);
+
+    const htmlBlocks = paragraphs.map(paragraph => {
+        let blockHtml = paragraph.trim();
+
+        // Preserve potential code blocks first
+        if (blockHtml.startsWith('```')) {
+            const lang = blockHtml.match(/^```(\w*)\n?/)?.[1] || '';
+            const code = blockHtml.replace(/^```\w*\n?/, '').replace(/\n```$/, '');
+            // Escape the code content
+            const escapedCode = escapeHtml(code);
+            return `<pre><code${lang ? ` class="language-${lang}"` : ''}>${escapedCode}</code></pre>`;
+        }
+
+        // Handle Headings (markdown #)
+        blockHtml = blockHtml
+            .replace(/^###### (.*$)/gim, '<h6>$1</h6>')
+            .replace(/^##### (.*$)/gim, '<h5>$1</h5>')
+            .replace(/^#### (.*$)/gim, '<h4>$1</h4>')
+            .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+            .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+            .replace(/^# (.*$)/gim, '<h1>$1</h1>');
+
+        // Handle Lists
+        // Unordered
+        blockHtml = blockHtml.replace(/^\s*[-*+] (.*$)/gim, '<li>$1</li>');
+        // Ordered
+        blockHtml = blockHtml.replace(/^\s*\d+\. (.*$)/gim, '<li>$1</li>');
+        // Wrap consecutive LIs in UL/OL
+        // This requires more complex parsing or multiple passes, simplified for now:
+        // Wrap blocks that start with <li> in <ul> or <ol> (basic guess)
+        if (blockHtml.startsWith('<li>')) {
+            // Basic check for ordered list marker somewhere in the original paragraph
+            blockHtml = paragraph.match(/^\s*\d+\./) 
+                ? `<ol>${blockHtml}</ol>` 
+                : `<ul>${blockHtml}</ul>`;
+        }
+
+        // Handle Bold and Italic
+        blockHtml = blockHtml
+            .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>') // Bold
+            .replace(/\*(.*?)\*/gim, '<em>$1</em>'); // Italic
+
+        // Handle Links
+        blockHtml = blockHtml.replace(/\[([^\]]+)\]\(([^)]+)\)/gim, '<a href="$2" target="_blank">$1</a>');
+
+        // Handle Inline Code
+        blockHtml = blockHtml.replace(/`([^`]+)`/gim, '<code>$1</code>');
+
+        // Handle Horizontal Rules
+        blockHtml = blockHtml.replace(/^(\*\*\*+|---|___+)$/gim, '<hr>');
+
+        // Convert remaining line breaks within a block to <br>, unless it's a list, heading, or pre block
+        if (!blockHtml.match(/^<(h[1-6]|ul|ol|li|pre|hr)/i)) {
+            blockHtml = blockHtml.replace(/\n/gim, '<br>');
+            // Wrap in <p> if it doesn't look like an existing block element was created
+            if (!blockHtml.match(/^<(h[1-6]|ul|ol|li|pre|hr|br)/i)) {
+                 blockHtml = `<p>${blockHtml}</p>`;
+            }
+        }
+        // Ensure list items rendered inside lists don't get wrapped in <p>
+        blockHtml = blockHtml.replace(/<p><li>/gim, '<li>').replace(/<\/li><\/p>/gim, '</li>');
+        blockHtml = blockHtml.replace(/<li><br>/gim, '<li>').replace(/<br><\/li>/gim, '</li>'); // Clean up breaks around LIs
+
+        return blockHtml;
+    });
+
+    let finalHtml = htmlBlocks.join('\n\n'); // Join blocks with double newline for spacing
+
+    // Cleanup potential <p><ul>...</ul></p> or <p><ol>...</ol></p>
+    finalHtml = finalHtml.replace(/<p>(<(?:ul|ol)>.*?<\/(?:ul|ol)>)<\/p>/gims, '$1');
+    // Cleanup potential <p><pre>...</pre></p>
+    finalHtml = finalHtml.replace(/<p>(<pre>.*?<\/pre>)<\/p>/gims, '$1');
+    // Cleanup potential empty paragraphs
+    finalHtml = finalHtml.replace(/<p>\s*<\/p>/gim, '');
+
+    logEvent("Markdown conversion to HTML complete.");
+    return finalHtml;
   }
 
   function getTextToReadFromSummary(summaryMarkdown) {
@@ -339,6 +440,16 @@
           .replace(/[`*#~]+/g, '')                   // Remove markdown symbols
           .replace(/\s{2,}/g, ' ')                    // Collapse multiple spaces
           .trim();
+
+      // *** NEW: Remove "Overall Summary" prefix if present for TTS ***
+      const prefixToRemove = "Overall Summary";
+      if (text.toLowerCase().startsWith(prefixToRemove.toLowerCase())) {
+          text = text.substring(prefixToRemove.length).trim();
+          // Also remove any leading colon or similar punctuation that might follow
+          text = text.replace(/^[\s:.-]+/, ''); 
+          logEvent("Removed 'Overall Summary' prefix for TTS.");
+      }
+
       logEvent(`Extracted text length: ${text.length}`);
       return text;
   }
@@ -734,36 +845,45 @@
 
     // --- Event Handlers ---
     utterance.onerror = (event) => {
-      console.error("SpeechSynthesisUtterance.onerror Event:", event);
       const errorType = event.error || "unknown error";
-
-      // **FIX:** Check if utterance exists before accessing properties
       const voiceName = utterance && utterance.voice ? utterance.voice.name : 'default (or utterance nulled)';
       const lang = utterance ? (utterance.lang || 'N/A') : 'N/A';
       const textSample = textChunk.substring(0, 100);
 
-      console.error(`TTS Error Details: Type='${errorType}', Chunk Index='${currentChunkIndex}', Voice='${voiceName}', Lang='${lang}', Text='${textSample}...'`);
-      logEvent(`TTS error on chunk ${currentChunkIndex + 1}: ${errorType}. Voice: ${voiceName}`);
-
-      let userMessage = `Text-to-speech failed: ${errorType}.`;
-      if (errorType === 'network') userMessage += ' Check internet connection or try a local voice.';
-      if (errorType === 'synthesis-failed') userMessage += ' Synthesis failed. Try a different voice.';
-      if (errorType === 'audio-busy') userMessage += ' Audio device might be busy.';
-      if (errorType === 'canceled' && !stopRequested) userMessage = 'Playback was interrupted.';
-      else if (errorType === 'canceled' && stopRequested) userMessage = null; // Don't show alert if manually stopped
-
-
-      // Don't reset state or alert if it was a manual cancellation
-      if (errorType !== 'canceled' || !stopRequested) {
-          resetTTSState();
-          // if (userMessage) alert(userMessage); // Remove the alert, keep logging
-          // Log the user message instead of showing an alert
-          if (userMessage) {
-              logEvent(`TTS Playback Issue (Not Alerting User): ${userMessage}`);
-          }
+      // **Refined Handling for Interruptions**
+      if (errorType === 'interrupted') {
+        // Log intentional interruptions less severely, avoid console.error
+        logEvent(`TTS playback interrupted (likely manual stop). Chunk: ${currentChunkIndex}, Voice: ${voiceName}, Text: "${textSample}..."`);
+        // We might still need to reset state if the interruption wasn't handled cleanly by onend
+        if (!stopRequested && !isPaused) { 
+          // If an interruption happens unexpectedly (not via our stop/pause logic)
+          logEvent("Interruption occurred outside of known stop/pause, resetting state.");
+          resetTTSState(); 
+        }
+        cancelInProgress = false; // Assume cancel is done if interrupted
       } else {
-          logEvent("Error was 'canceled' likely due to manual stop/pause, suppressing alert.");
-          cancelInProgress = false; // Cancellation seems complete
+        // Log other errors more prominently using console.error
+        console.error("SpeechSynthesisUtterance.onerror Event:", event);
+        console.error(`TTS Error Details: Type='${errorType}', Chunk Index='${currentChunkIndex}', Voice='${voiceName}', Lang='${lang}', Text='${textSample}...'`);
+        logEvent(`TTS error on chunk ${currentChunkIndex + 1}: ${errorType}. Voice: ${voiceName}`);
+
+        let userMessage = `Text-to-speech failed: ${errorType}.`;
+        if (errorType === 'network') userMessage += ' Check internet connection or try a local voice.';
+        if (errorType === 'synthesis-failed') userMessage += ' Synthesis failed. Try a different voice.';
+        if (errorType === 'audio-busy') userMessage += ' Audio device might be busy.';
+        // Handle 'canceled' specifically if needed, although 'interrupted' is more common for stops.
+        if (errorType === 'canceled' && stopRequested) userMessage = null; // Don't show alert if manually stopped
+
+        // Don't reset state or alert if it was a manual cancellation handled elsewhere
+        if ((errorType !== 'canceled' && errorType !== 'interrupted') || !stopRequested) {
+            resetTTSState();
+            if (userMessage) {
+                logEvent(`TTS Playback Issue (Not Alerting User): ${userMessage}`);
+            }
+        } else {
+            logEvent(`Error was '${errorType}' likely due to manual stop/pause, suppressing alert/reset.`);
+            cancelInProgress = false; // Cancellation seems complete
+        }
       }
     };
 
