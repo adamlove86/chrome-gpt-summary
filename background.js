@@ -100,6 +100,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.action === "transcriptExtracted") {
     appendLog("Received transcriptExtracted message from tab " + (sender.tab ? sender.tab.id : 'unknown'));
     summariseText(request.text, request.pageUrl, "youtube", request.pageTitle, request.publishedDate, sender.tab.id);
+  } else if (request.action === "transcriptError") {
+    let tabId = sender && sender.tab ? sender.tab.id : null;
+    appendLog("Received transcriptError message: " + request.error + " from tab " + tabId);
+    displayError(request.error, request.pageUrl, tabId);
   } else if (request.action === "displayError") {
     let tabId = sender && sender.tab ? sender.tab.id : null;
     appendLog("Received displayError message: " + request.error + " from tab " + tabId);
