@@ -6,6 +6,7 @@ const summariseBtn = document.getElementById('summariseBtn');
 const blockSiteBtn = document.getElementById('blockSiteBtn');
 const optionsBtn = document.getElementById('optionsBtn');
 const copyTranscriptBtn = document.getElementById('copyTranscriptBtn');
+const copyContentBtn = document.getElementById('copyContentBtn');
 const popupTitle = document.getElementById('popupTitle'); // Get title element
 
 // Function to handle button press visual feedback
@@ -25,6 +26,11 @@ function initializePopup() {
     if (currentTab && currentTab.url && currentTab.url.includes('youtube.com/watch')) {
       if (copyTranscriptBtn) {
         copyTranscriptBtn.style.display = 'block'; // Show the button (use block for column layout)
+      }
+    } else if (currentTab && currentTab.url && !currentTab.url.startsWith('chrome://') && !currentTab.url.startsWith('chrome-extension://')) {
+      // Show copy content button for non-YouTube pages (excluding chrome internal pages)
+      if (copyContentBtn) {
+        copyContentBtn.style.display = 'block'; // Show the button (use block for column layout)
       }
     }
   });
@@ -62,6 +68,8 @@ document.getElementById('summariseBtn').addEventListener('click', async () => {
           target: { tabId: currentTab.id },
           files: ['JSDOMParser.js', 'Readability.js', 'contentScript.js']
         });
+        // Send a message to start content extraction for summarization
+        chrome.tabs.sendMessage(currentTab.id, { action: "extractContentForSummarization" });
       } catch (error) {
         console.error("Error injecting scripts:", error);
       }
@@ -177,6 +185,68 @@ if (copyTranscriptBtn) {
           console.error("Error during transcript copy process:", error);
           copyTranscriptBtn.textContent = 'Error!';
           setTimeout(() => copyTranscriptBtn.textContent = 'Copy Transcript', 2000);
+        }
+      }
+    });
+  });
+}
+
+// Listener for the Copy Content button
+if (copyContentBtn) {
+  copyContentBtn.addEventListener('click', async () => {
+    handleButtonPress('copyContentBtn');
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+      const currentTab = tabs[0];
+      if (currentTab && currentTab.id) {
+        try {
+          // Ensure necessary scripts are injected
+          await chrome.scripting.executeScript({
+            target: { tabId: currentTab.id },
+            files: ['JSDOMParser.js', 'Readability.js', 'contentScript.js']
+          });
+          // Request content and metadata from content script
+          chrome.tabs.sendMessage(currentTab.id, { action: "getContentAndMetadata" }, (response) => {
+            if (chrome.runtime.lastError) {
+              console.error("Error sending message:", chrome.runtime.lastError.message);
+              copyContentBtn.textContent = 'Error!';
+              setTimeout(() => copyContentBtn.textContent = 'Copy Content', 2000);
+              return;
+            }
+            if (response && response.action === "contentData") {
+              const { content, title, publishedDate, url } = response;
+              if (content) {
+                const wordCount = content.trim().split(/\s+/).length;
+                const header = `Title: ${title || 'N/A'}\nPublished: ${publishedDate || 'N/A'}\nURL: ${url || 'N/A'}\nWord Count: ${wordCount}\n\n---\n\n`;
+                const textToCopy = header + content;
+
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                  console.log('Content and metadata copied to clipboard.');
+                  copyContentBtn.textContent = 'Copied!';
+                  setTimeout(() => copyContentBtn.textContent = 'Copy Content', 2000);
+                }).catch(err => {
+                  console.error('Failed to copy content: ', err);
+                  copyContentBtn.textContent = 'Copy Failed!';
+                  setTimeout(() => copyContentBtn.textContent = 'Copy Content', 2000);
+                });
+              } else {
+                console.error('No content received from content script.');
+                copyContentBtn.textContent = 'No Content!';
+                setTimeout(() => copyContentBtn.textContent = 'Copy Content', 2000);
+              }
+            } else if (response && response.action === "contentError") {
+                 console.error("Error fetching content:", response.error);
+                 copyContentBtn.textContent = 'Error!';
+                 setTimeout(() => copyContentBtn.textContent = 'Copy Content', 2000);
+            } else {
+                console.error('Unexpected response from content script:', response);
+                copyContentBtn.textContent = 'Error!';
+                setTimeout(() => copyContentBtn.textContent = 'Copy Content', 2000);
+            }
+          });
+        } catch (error) {
+          console.error("Error during content copy process:", error);
+          copyContentBtn.textContent = 'Error!';
+          setTimeout(() => copyContentBtn.textContent = 'Copy Content', 2000);
         }
       }
     });
