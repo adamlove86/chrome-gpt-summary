@@ -146,8 +146,8 @@ async function getApiKey() {
 async function summariseText(text, pageUrl, contentType, pageTitle, publishedDate, tabId) {
   appendLog("Starting summarisation for tab " + tabId + ". Content type: " + contentType);
   chrome.storage.sync.get(["youtubePrompt", "textPrompt", "model", "maxTokens", "temperature", "debug"], async (data) => {
-    const youtubePrompt = data.youtubePrompt || getDefaultYouTubePrompt();
-    const textPrompt = data.textPrompt || getDefaultTextPrompt();
+    const youtubePrompt = data.youtubePrompt || await getDefaultYouTubePrompt();
+    const textPrompt = data.textPrompt || await getDefaultTextPrompt();
     const model = data.model || "gpt-4o-mini";
     const maxTokens = data.maxTokens || 1000;
     const temperature = data.temperature || 0.7;

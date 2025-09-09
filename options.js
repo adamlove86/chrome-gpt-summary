@@ -42,27 +42,32 @@ const downloadLogBtn = document.getElementById('downloadLogBtn');
 // --- Functions ---
 
 // Load all settings from storage
-function loadSettings() {
+async function loadSettings() {
   chrome.storage.sync.get({
     apiKey: '',
     model: 'gpt-4o-mini',
     maxTokens: 1000,
     temperature: 0.7,
     debug: false,
-    youtubePrompt: getDefaultYouTubePrompt(),
-    textPrompt: getDefaultTextPrompt(),
+    youtubePrompt: '',
+    textPrompt: '',
     defaultVoice: '', // Will be populated by populateVoiceList
     speechSpeed: 100,
     blockedSites: [],
     logLineLimit: 30 // Keep the new log line limit setting
-  }, (data) => {
+  }, async (data) => {
     document.getElementById('apiKey').value = data.apiKey || "";
     document.getElementById('model').value = data.model || "gpt-4o-mini";
     document.getElementById('maxTokens').value = data.maxTokens || 1000;
     document.getElementById('temperature').value = data.temperature || 0.7;
     document.getElementById('debug').checked = data.debug || false;
-    document.getElementById('youtubePrompt').value = data.youtubePrompt || getDefaultYouTubePrompt();
-    document.getElementById('textPrompt').value = data.textPrompt || getDefaultTextPrompt();
+    
+    // Load prompts from markdown files if not set in storage
+    const youtubePrompt = data.youtubePrompt || await getDefaultYouTubePrompt();
+    const textPrompt = data.textPrompt || await getDefaultTextPrompt();
+    
+    document.getElementById('youtubePrompt').value = youtubePrompt;
+    document.getElementById('textPrompt').value = textPrompt;
     document.getElementById('speechSpeed').value = data.speechSpeed || 100;
     document.getElementById('speechSpeedValue').textContent = `${data.speechSpeed || 100}%`;
     document.getElementById('logLineLimit').value = data.logLineLimit || 30;

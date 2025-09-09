@@ -1,4 +1,36 @@
-function getDefaultYouTubePrompt() {
+// Cache for loaded prompts
+let promptCache = {
+  youtube: null,
+  text: null
+};
+
+// Function to load markdown file content
+async function loadMarkdownFile(filename) {
+  try {
+    const response = await fetch(chrome.runtime.getURL(filename));
+    if (!response.ok) {
+      throw new Error(`Failed to load ${filename}: ${response.status}`);
+    }
+    return await response.text();
+  } catch (error) {
+    console.error(`Error loading ${filename}:`, error);
+    return null;
+  }
+}
+
+// Load YouTube prompt from markdown file
+async function getDefaultYouTubePrompt() {
+  if (promptCache.youtube) {
+    return promptCache.youtube;
+  }
+  
+  const content = await loadMarkdownFile('youtube-prompt.md');
+  if (content) {
+    promptCache.youtube = content.trim();
+    return promptCache.youtube;
+  }
+  
+  // Fallback to hardcoded prompt if file loading fails
   return `Summarise the following transcript from a YouTube video. Present the summary in a clear, well-structured manner with proper formatting and spacing. Your response MUST use the following structure:
 
 1. **Overall Summary** (2-3 paragraphs):
@@ -32,7 +64,19 @@ function getDefaultYouTubePrompt() {
 Remember: The goal is to create an easily scannable, well-formatted summary that is both informative and pleasant to read.`;
 }
 
-function getDefaultTextPrompt() {
+// Load text prompt from markdown file
+async function getDefaultTextPrompt() {
+  if (promptCache.text) {
+    return promptCache.text;
+  }
+  
+  const content = await loadMarkdownFile('text-prompt.md');
+  if (content) {
+    promptCache.text = content.trim();
+    return promptCache.text;
+  }
+  
+  // Fallback to hardcoded prompt if file loading fails
   return `Summarise the following text in a clear, well-structured manner with proper formatting and spacing. Your response MUST use the following structure:
 
 1. **Overall Summary** (2-3 paragraphs):
@@ -62,7 +106,7 @@ function getDefaultTextPrompt() {
    - Each section should be its own paragraph
    - Avoid walls of text - use proper spacing
    - No abbreviations with periods (write "US" not "U.S.")
-00000
+
 Remember: The goal is to create an easily scannable, well-formatted summary that is both informative and pleasant to read.`;
 }
 

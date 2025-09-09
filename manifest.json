@@ -45,7 +45,9 @@
         "displayError.js",
         "youtubeTranscript.js",
         "contentScript.js",
-        "sidebarStyles.css"
+        "sidebarStyles.css",
+        "youtube-prompt.md",
+        "text-prompt.md"
       ],
       "matches": ["<all_urls>"]
     }
