@@ -8,7 +8,7 @@ Summarise the YouTube video transcript in a concise, scannable format.
 - Capture distinct points: who/what/how/impact/limits.
 - Include key numbers with units and bold them (e.g., **166M pieces**, **29,000 t CO₂e**).
 - Add one practical example if relevant (e.g., avocado window from 1.5 → 4 days).
-- Include timestamps *mm:ss* only when they help locate major segments.
+- For longer videos, use section headings with timestamps in italics (e.g., *Introduction - 0:00*, *Main Argument - 5:30*).
 - Avoid repeating the lead.
 
 3) FORMATTING

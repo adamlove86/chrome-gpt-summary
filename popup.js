@@ -47,8 +47,19 @@ function initializePopup() {
 // Run initialization
 initializePopup();
 
+// Prevent multiple simultaneous summarization requests
+let isSummarizing = false;
+
 document.getElementById('summariseBtn').addEventListener('click', async () => {
+  // Prevent multiple clicks
+  if (isSummarizing) {
+    console.log('Summarization already in progress, ignoring click');
+    return;
+  }
+  
+  isSummarizing = true;
   handleButtonPress('summariseBtn'); // Add visual feedback
+  
   chrome.tabs.query({ active: true, currentWindow: true }, async function(tabs) {
     const currentTab = tabs[0];
     if (currentTab && currentTab.url && currentTab.url.includes('youtube.com/watch')) {
@@ -74,6 +85,11 @@ document.getElementById('summariseBtn').addEventListener('click', async () => {
         console.error("Error injecting scripts:", error);
       }
     }
+    
+    // Reset the flag after a short delay to allow for the summarization process to start
+    setTimeout(() => {
+      isSummarizing = false;
+    }, 2000); // 2 second delay to prevent rapid successive clicks
   });
 });
 

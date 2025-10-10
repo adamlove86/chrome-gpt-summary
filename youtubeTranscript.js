@@ -1,5 +1,13 @@
 // youtubeTranscript.js
 
+// Prevent duplicate message listeners by checking if we've already set up listeners
+if (window.summariseExtensionYouTubeScriptLoaded) {
+  console.log('YouTube script already loaded, skipping duplicate setup');
+  // Exit early to prevent duplicate message listeners
+} else {
+  window.summariseExtensionYouTubeScriptLoaded = true;
+  console.log('Setting up YouTube script message listeners');
+
 // Function to extract metadata and then initiate transcript extraction
 function extractYouTubeData(sendResponseCallback) {
   // Extract metadata
@@ -95,3 +103,5 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 });
+
+} // End of duplicate prevention block

@@ -1,5 +1,13 @@
 // contentScript.js
 
+// Prevent duplicate message listeners by checking if we've already set up listeners
+if (window.summariseExtensionContentScriptLoaded) {
+  console.log('Content script already loaded, skipping duplicate setup');
+  // Exit early to prevent duplicate message listeners
+} else {
+  window.summariseExtensionContentScriptLoaded = true;
+  console.log('Setting up content script message listeners');
+
 // Function to extract content and metadata for copying
 function extractContentAndMetadata(sendResponseCallback) {
   try {
@@ -136,3 +144,5 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 if (window.location.search.includes('autoRun=true') || document.currentScript?.dataset?.autoRun === 'true') {
   extractContentForSummarization();
 }
+
+} // End of duplicate prevention block
