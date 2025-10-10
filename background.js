@@ -119,6 +119,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.action === "log") {
     // Log message coming from a content script.
     appendLog(request.message);
+  } else if (request.action === "openChatGPTWithText") {
+    appendLog("Received openChatGPTWithText message");
+    openChatGPTWithText(request.text);
   }
 });
 
@@ -279,4 +282,99 @@ async function downloadLogFile() {
       reader.readAsDataURL(blob);
     });
   });
+}
+
+async function openChatGPTWithText(text) {
+  appendLog("Opening ChatGPT with text (length: " + text.length + ")");
+  
+  const chatGPTUrls = [
+    'https://chatgpt.com/',
+    'https://chat.openai.com/'
+  ];
+  
+  // Try the first URL (chatgpt.com is the newer domain)
+  const targetUrl = chatGPTUrls[0];
+  
+  try {
+    // Create a new tab with ChatGPT
+    const tab = await chrome.tabs.create({ url: targetUrl, active: true });
+    appendLog("Created ChatGPT tab with ID: " + tab.id);
+    
+    // Wait for the tab to finish loading
+    const tabLoadedPromise = new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Tab load timeout'));
+      }, 30000); // 30 second timeout
+      
+      const listener = (tabId, changeInfo, updatedTab) => {
+        if (tabId === tab.id && changeInfo.status === 'complete') {
+          clearTimeout(timeout);
+          chrome.tabs.onUpdated.removeListener(listener);
+          resolve(updatedTab);
+        }
+      };
+      
+      chrome.tabs.onUpdated.addListener(listener);
+    });
+    
+    try {
+      await tabLoadedPromise;
+      appendLog("ChatGPT tab finished loading");
+      
+      // Wait a bit more for React to initialize
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Inject the text as a data element that the injection script can read
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: (textData) => {
+          const dataElement = document.createElement('div');
+          dataElement.id = '__chatgpt_text_data__';
+          dataElement.style.display = 'none';
+          dataElement.textContent = textData;
+          document.body.appendChild(dataElement);
+        },
+        args: [text]
+      });
+      
+      // Inject the script that will fill and submit
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['chatgpt_inject.js']
+      });
+      
+      appendLog("ChatGPT injection script executed");
+      
+    } catch (loadError) {
+      appendLog("Tab load error or timeout: " + loadError.message);
+      // Fallback: copy to clipboard
+      await fallbackCopyToClipboard(text, tab.id);
+    }
+    
+  } catch (error) {
+    appendLog("Error opening ChatGPT: " + error.message);
+    console.error("Error opening ChatGPT:", error);
+  }
+}
+
+async function fallbackCopyToClipboard(text, tabId) {
+  appendLog("Using clipboard fallback");
+  try {
+    // Try to inject a simple copy script
+    await chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      func: (textToCopy) => {
+        navigator.clipboard.writeText(textToCopy).then(() => {
+          alert('Text copied to clipboard! Please paste it into ChatGPT manually.');
+        }).catch(err => {
+          console.error('Clipboard copy failed:', err);
+          alert('Could not copy to clipboard. Please check browser permissions.');
+        });
+      },
+      args: [text]
+    });
+    appendLog("Fallback clipboard copy executed");
+  } catch (err) {
+    appendLog("Fallback clipboard copy failed: " + err.message);
+  }
 }

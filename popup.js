@@ -7,6 +7,8 @@ const blockSiteBtn = document.getElementById('blockSiteBtn');
 const optionsBtn = document.getElementById('optionsBtn');
 const copyTranscriptBtn = document.getElementById('copyTranscriptBtn');
 const copyContentBtn = document.getElementById('copyContentBtn');
+const sendToChatGPTBtn = document.getElementById('sendToChatGPTBtn');
+const factCheckBtn = document.getElementById('factCheckBtn');
 const popupTitle = document.getElementById('popupTitle'); // Get title element
 
 // Function to handle button press visual feedback
@@ -27,10 +29,22 @@ function initializePopup() {
       if (copyTranscriptBtn) {
         copyTranscriptBtn.style.display = 'block'; // Show the button (use block for column layout)
       }
+      if (sendToChatGPTBtn) {
+        sendToChatGPTBtn.style.display = 'block'; // Show for YouTube videos
+      }
+      if (factCheckBtn) {
+        factCheckBtn.style.display = 'block'; // Show for YouTube videos
+      }
     } else if (currentTab && currentTab.url && !currentTab.url.startsWith('chrome://') && !currentTab.url.startsWith('chrome-extension://')) {
       // Show copy content button for non-YouTube pages (excluding chrome internal pages)
       if (copyContentBtn) {
         copyContentBtn.style.display = 'block'; // Show the button (use block for column layout)
+      }
+      if (sendToChatGPTBtn) {
+        sendToChatGPTBtn.style.display = 'block'; // Show for articles
+      }
+      if (factCheckBtn) {
+        factCheckBtn.style.display = 'block'; // Show for articles
       }
     }
   });
@@ -263,6 +277,222 @@ if (copyContentBtn) {
           console.error("Error during content copy process:", error);
           copyContentBtn.textContent = 'Error!';
           setTimeout(() => copyContentBtn.textContent = 'Copy Content', 2000);
+        }
+      }
+    });
+  });
+}
+
+// Listener for the Send to ChatGPT button
+if (sendToChatGPTBtn) {
+  sendToChatGPTBtn.addEventListener('click', async () => {
+    handleButtonPress('sendToChatGPTBtn');
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+      const currentTab = tabs[0];
+      if (currentTab && currentTab.id) {
+        // Determine if this is YouTube or article page
+        const isYouTube = currentTab.url && currentTab.url.includes('youtube.com/watch');
+        
+        try {
+          if (isYouTube) {
+            // YouTube: inject and get transcript
+            await chrome.scripting.executeScript({
+              target: { tabId: currentTab.id },
+              files: ['youtubeTranscript.js']
+            });
+            chrome.tabs.sendMessage(currentTab.id, { action: "getTranscriptAndMetadata" }, (response) => {
+              if (chrome.runtime.lastError) {
+                console.error("Error sending message:", chrome.runtime.lastError.message);
+                sendToChatGPTBtn.textContent = 'Error!';
+                setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
+                return;
+              }
+              if (response && response.action === "transcriptData") {
+                const { transcript, title, channel, date, url } = response;
+                if (transcript) {
+                  const wordCount = transcript.trim().split(/\s+/).length;
+                  const header = `Title: ${title || 'N/A'}\nChannel: ${channel || 'N/A'}\nPublished: ${date || 'N/A'}\nURL: ${url || 'N/A'}\nWord Count: ${wordCount}\n\n---\n\n`;
+                  const preface = "I have questions about this YouTube video. Please review the text below.\n\n";
+                  const fullText = preface + header + transcript;
+                  
+                  // Send to background to open ChatGPT
+                  chrome.runtime.sendMessage({ 
+                    action: "openChatGPTWithText", 
+                    text: fullText 
+                  });
+                  sendToChatGPTBtn.textContent = 'Opening...';
+                  setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
+                } else {
+                  console.error('No transcript received from content script.');
+                  sendToChatGPTBtn.textContent = 'No Transcript!';
+                  setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
+                }
+              } else if (response && response.action === "transcriptError") {
+                console.error("Error fetching transcript:", response.error);
+                sendToChatGPTBtn.textContent = 'Error!';
+                setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
+              } else {
+                console.error('Unexpected response from content script:', response);
+                sendToChatGPTBtn.textContent = 'Error!';
+                setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
+              }
+            });
+          } else {
+            // Article: inject and get content
+            await chrome.scripting.executeScript({
+              target: { tabId: currentTab.id },
+              files: ['JSDOMParser.js', 'Readability.js', 'contentScript.js']
+            });
+            chrome.tabs.sendMessage(currentTab.id, { action: "getContentAndMetadata" }, (response) => {
+              if (chrome.runtime.lastError) {
+                console.error("Error sending message:", chrome.runtime.lastError.message);
+                sendToChatGPTBtn.textContent = 'Error!';
+                setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
+                return;
+              }
+              if (response && response.action === "contentData") {
+                const { content, title, publishedDate, url } = response;
+                if (content) {
+                  const wordCount = content.trim().split(/\s+/).length;
+                  const header = `Title: ${title || 'N/A'}\nPublished: ${publishedDate || 'N/A'}\nURL: ${url || 'N/A'}\nWord Count: ${wordCount}\n\n---\n\n`;
+                  const preface = "I have questions about this article. Please review the text below.\n\n";
+                  const fullText = preface + header + content;
+                  
+                  // Send to background to open ChatGPT
+                  chrome.runtime.sendMessage({ 
+                    action: "openChatGPTWithText", 
+                    text: fullText 
+                  });
+                  sendToChatGPTBtn.textContent = 'Opening...';
+                  setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
+                } else {
+                  console.error('No content received from content script.');
+                  sendToChatGPTBtn.textContent = 'No Content!';
+                  setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
+                }
+              } else if (response && response.action === "contentError") {
+                console.error("Error fetching content:", response.error);
+                sendToChatGPTBtn.textContent = 'Error!';
+                setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
+              } else {
+                console.error('Unexpected response from content script:', response);
+                sendToChatGPTBtn.textContent = 'Error!';
+                setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
+              }
+            });
+          }
+        } catch (error) {
+          console.error("Error during ChatGPT send process:", error);
+          sendToChatGPTBtn.textContent = 'Error!';
+          setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
+        }
+      }
+    });
+  });
+}
+
+// Listener for the Fact Check button
+if (factCheckBtn) {
+  factCheckBtn.addEventListener('click', async () => {
+    handleButtonPress('factCheckBtn');
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+      const currentTab = tabs[0];
+      if (currentTab && currentTab.id) {
+        // Determine if this is YouTube or article page
+        const isYouTube = currentTab.url && currentTab.url.includes('youtube.com/watch');
+        
+        try {
+          if (isYouTube) {
+            // YouTube: inject and get transcript
+            await chrome.scripting.executeScript({
+              target: { tabId: currentTab.id },
+              files: ['youtubeTranscript.js']
+            });
+            chrome.tabs.sendMessage(currentTab.id, { action: "getTranscriptAndMetadata" }, (response) => {
+              if (chrome.runtime.lastError) {
+                console.error("Error sending message:", chrome.runtime.lastError.message);
+                factCheckBtn.textContent = 'Error!';
+                setTimeout(() => factCheckBtn.textContent = '🔍 Fact Check', 2000);
+                return;
+              }
+              if (response && response.action === "transcriptData") {
+                const { transcript, title, channel, date, url } = response;
+                if (transcript) {
+                  const wordCount = transcript.trim().split(/\s+/).length;
+                  const header = `Title: ${title || 'N/A'}\nChannel: ${channel || 'N/A'}\nPublished: ${date || 'N/A'}\nURL: ${url || 'N/A'}\nWord Count: ${wordCount}\n\n---\n\n`;
+                  const preface = "Please fact-check the key claims in this YouTube video transcript using credible sources. Focus on verifiable facts, statistics, and significant assertions. Be concise and prioritize the most important claims.\n\n";
+                  const fullText = preface + header + transcript;
+                  
+                  // Send to background to open ChatGPT
+                  chrome.runtime.sendMessage({ 
+                    action: "openChatGPTWithText", 
+                    text: fullText 
+                  });
+                  factCheckBtn.textContent = 'Opening...';
+                  setTimeout(() => factCheckBtn.textContent = '🔍 Fact Check', 2000);
+                } else {
+                  console.error('No transcript received from content script.');
+                  factCheckBtn.textContent = 'No Transcript!';
+                  setTimeout(() => factCheckBtn.textContent = '🔍 Fact Check', 2000);
+                }
+              } else if (response && response.action === "transcriptError") {
+                console.error("Error fetching transcript:", response.error);
+                factCheckBtn.textContent = 'Error!';
+                setTimeout(() => factCheckBtn.textContent = '🔍 Fact Check', 2000);
+              } else {
+                console.error('Unexpected response from content script:', response);
+                factCheckBtn.textContent = 'Error!';
+                setTimeout(() => factCheckBtn.textContent = '🔍 Fact Check', 2000);
+              }
+            });
+          } else {
+            // Article: inject and get content
+            await chrome.scripting.executeScript({
+              target: { tabId: currentTab.id },
+              files: ['JSDOMParser.js', 'Readability.js', 'contentScript.js']
+            });
+            chrome.tabs.sendMessage(currentTab.id, { action: "getContentAndMetadata" }, (response) => {
+              if (chrome.runtime.lastError) {
+                console.error("Error sending message:", chrome.runtime.lastError.message);
+                factCheckBtn.textContent = 'Error!';
+                setTimeout(() => factCheckBtn.textContent = '🔍 Fact Check', 2000);
+                return;
+              }
+              if (response && response.action === "contentData") {
+                const { content, title, publishedDate, url } = response;
+                if (content) {
+                  const wordCount = content.trim().split(/\s+/).length;
+                  const header = `Title: ${title || 'N/A'}\nPublished: ${publishedDate || 'N/A'}\nURL: ${url || 'N/A'}\nWord Count: ${wordCount}\n\n---\n\n`;
+                  const preface = "Please fact-check the key claims in this article using credible sources. Focus on verifiable facts, statistics, and significant assertions. Be concise and prioritize the most important claims.\n\n";
+                  const fullText = preface + header + content;
+                  
+                  // Send to background to open ChatGPT
+                  chrome.runtime.sendMessage({ 
+                    action: "openChatGPTWithText", 
+                    text: fullText 
+                  });
+                  factCheckBtn.textContent = 'Opening...';
+                  setTimeout(() => factCheckBtn.textContent = '🔍 Fact Check', 2000);
+                } else {
+                  console.error('No content received from content script.');
+                  factCheckBtn.textContent = 'No Content!';
+                  setTimeout(() => factCheckBtn.textContent = '🔍 Fact Check', 2000);
+                }
+              } else if (response && response.action === "contentError") {
+                console.error("Error fetching content:", response.error);
+                factCheckBtn.textContent = 'Error!';
+                setTimeout(() => factCheckBtn.textContent = '🔍 Fact Check', 2000);
+              } else {
+                console.error('Unexpected response from content script:', response);
+                factCheckBtn.textContent = 'Error!';
+                setTimeout(() => factCheckBtn.textContent = '🔍 Fact Check', 2000);
+              }
+            });
+          }
+        } catch (error) {
+          console.error("Error during fact check process:", error);
+          factCheckBtn.textContent = 'Error!';
+          setTimeout(() => factCheckBtn.textContent = '🔍 Fact Check', 2000);
         }
       }
     });

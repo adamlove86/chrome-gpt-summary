@@ -45,6 +45,7 @@
         "displayError.js",
         "youtubeTranscript.js",
         "contentScript.js",
+        "chatgpt_inject.js",
         "sidebarStyles.css",
         "youtube-prompt.md",
         "text-prompt.md"

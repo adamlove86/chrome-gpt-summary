@@ -1,6 +1,6 @@
 # Summarise with GPT-4o-mini Chrome Extension
 
-A Chrome extension that summarises web pages, selected text, and YouTube transcripts using the OpenAI API (defaulting to GPT-4o-mini). It also includes a simple site blocker feature. This plugin is designed to help you quickly generate concise or detailed summaries directly in your browser.
+A Chrome extension that summarises web pages, selected text, and YouTube transcripts using the OpenAI API (defaulting to GPT-4o-mini). It also includes ChatGPT integration for asking questions and fact-checking, plus a simple site blocker feature. This plugin is designed to help you quickly generate concise or detailed summaries and verify information directly in your browser.
 
 ![Extension Popup](summarise.png)
 
@@ -9,6 +9,13 @@ A Chrome extension that summarises web pages, selected text, and YouTube transcr
 - **Web Page Summarization:** Automatically extracts the main content of a web page using Mozilla's Readability library and sends it for summarization.
 - **YouTube Transcript Summarization:** Extracts available transcripts from YouTube videos and summarizes them.
 - **Selected Text Summarization:** Summarize only the text you highlight on a page.
+- **ChatGPT Integration:**
+  - **Send to ChatGPT:** Opens ChatGPT in a new tab with the article/video content pre-filled, allowing you to ask follow-up questions interactively.
+  - **Fact Check:** Automatically sends content to ChatGPT with a specialized prompt to fact-check key claims using credible sources.
+  - Both features use intelligent DOM injection with multiple fallback strategies to ensure compatibility with ChatGPT's interface.
+- **Copy to Clipboard:**
+  - Copy YouTube transcripts with metadata (title, channel, date, word count).
+  - Copy article content with metadata (title, published date, URL, word count).
 - **Configurable Summarization:**
   - Choose the OpenAI model (e.g., `gpt-4o-mini`, `gpt-4`, etc.).
   - Set maximum tokens for the summary.
@@ -18,17 +25,19 @@ A Chrome extension that summarises web pages, selected text, and YouTube transcr
 - **Site Blocker:** Maintain a list of website origins (e.g., `https://www.example.com`) to block. When visiting a blocked site, the extension attempts to stop the page load. Add sites to the blocklist via the popup or options page.
 - **API Key Management:** Securely store your OpenAI API key in Chrome's sync storage or load it locally from a `key.txt` file (useful for development, ignored by `.gitignore`).
 - **Debug Logging:** Maintains a detailed log of actions in local storage, which can be downloaded from the options page for troubleshooting.
-- **Summary Display:** Shows summaries in a clean overlay on the current page, including metadata like original word count and estimated read time (metadata not explicitly confirmed in code, but implied by display script).
+- **Summary Display:** Shows summaries in a clean overlay on the current page, including metadata like original word count and estimated read time.
 
 ## Installation
 
 ### 1. Obtain the Code
 
 - **Clone:** Use Git to clone the repository:
+
   ```bash
   git clone https://github.com/adamlove86/chrome-gpt-summary.git
   cd chrome-gpt-summary
   ```
+
 - **Download:** Alternatively, download the repository as a ZIP file from GitHub and extract it to a local folder.
 
 ### 2. Load the Extension in Chrome/Edge
@@ -55,30 +64,78 @@ A Chrome extension that summarises web pages, selected text, and YouTube transcr
 
 ## Usage
 
+### Basic Summarization
+
 1.  **Summarize Current Page:**
     - Navigate to the web page or YouTube video you want to summarize.
     - Click the extension icon in your toolbar.
-    - Click the **Summarise Page** button in the popup.
+    - Click the **📄 Summarise Page** button in the popup.
     - _Alternatively:_ Right-click anywhere on the page (not on a link or selected text) and choose "Summarise with ChatGPT" from the context menu.
 2.  **Summarize Selected Text:**
     - Highlight the text you want to summarize on any web page.
     - Right-click on the selected text.
     - Choose "Summarise with ChatGPT" from the context menu.
-3.  **Block Current Site:**
+
+### ChatGPT Integration
+
+3.  **Send to ChatGPT (Interactive Questions):**
+    - Navigate to an article or YouTube video.
+    - Click the extension icon.
+    - Click the **💬 Send to ChatGPT** button.
+    - ChatGPT will open in a new tab with the content pre-filled and auto-submitted.
+    - You can then ask follow-up questions about the content.
+
+4.  **Fact Check Content:**
+    - Navigate to an article or YouTube video.
+    - Click the extension icon.
+    - Click the **🔍 Fact Check** button.
+    - ChatGPT will open with a specialized fact-checking prompt, analyzing key claims using credible sources.
+
+### Copy to Clipboard
+
+5.  **Copy Transcript/Content:**
+    - For YouTube videos: Click **📋 Copy Transcript** to copy the transcript with metadata.
+    - For articles: Click **📋 Copy Content** to copy the article text with metadata.
+
+### Site Blocking
+
+6.  **Block Current Site:**
     - Navigate to the site you want to block.
     - Click the extension icon.
-    - Click the **Block Current Site** button. Confirm the site origin in the prompt.
-4.  **View/Download Debug Logs:**
-    - Go to the **Options** page.
-    - Click the **Download Debug Log** button.
+    - Click the **🚫 Block Paywall Site** button. Confirm the site origin in the prompt.
+
+### Debug & Settings
+
+7.  **View/Download Debug Logs:**
+    - Go to the **⚙️ Options** page.
+    - Click the **Download Debug Log** button or **View Recent Logs**.
 
 ## Development Notes
 
 - The extension uses a background service worker (`background.js`) for handling API calls, context menus, and message passing.
 - Content scripts (`contentScript.js`, `youtubeTranscript.js`, `content_blocker.js`) are injected into pages to extract text, handle transcripts, and block sites.
+- ChatGPT integration (`chatgpt_inject.js`) uses ProseMirror-aware DOM manipulation to auto-fill and submit prompts with multiple selector fallbacks.
 - `Readability.js` is used for extracting the main article content from web pages.
 - Summaries and errors are displayed using dynamically injected scripts (`displaySummary.js`, `displayError.js`).
 - Settings are stored using `chrome.storage.sync` (for settings) and `chrome.storage.local` (for logs and latest summary data).
+
+## Technical Details
+
+### ChatGPT Integration Architecture
+
+The extension can automatically open ChatGPT and submit content by:
+
+1. Opening a new tab to `https://chatgpt.com/`
+2. Waiting for page load and React initialization
+3. Injecting text into a hidden data element
+4. Using `chatgpt_inject.js` to:
+   - Find ChatGPT's ProseMirror editor (`#prompt-textarea`)
+   - Set text in the internal `<p>` element
+   - Dispatch proper input events for React compatibility
+   - Click the send button (`data-testid="send-button"`)
+5. Falling back to clipboard copy if DOM structure changes or user isn't logged in
+
+The system uses multiple selector strategies and retry logic to maintain compatibility as ChatGPT's interface evolves.
 
 ## Licence
 
