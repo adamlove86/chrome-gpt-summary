@@ -45,7 +45,7 @@ const downloadLogBtn = document.getElementById('downloadLogBtn');
 async function loadSettings() {
   chrome.storage.sync.get({
     apiKey: '',
-    model: 'gpt-4o-mini',
+    model: 'gpt-5-mini',
     maxTokens: 1000,
     temperature: 0.7,
     debug: false,
@@ -57,7 +57,7 @@ async function loadSettings() {
     logLineLimit: 30 // Keep the new log line limit setting
   }, async (data) => {
     document.getElementById('apiKey').value = data.apiKey || "";
-    document.getElementById('model').value = data.model || "gpt-4o-mini";
+    populateModelSelect(data.model || "gpt-5-mini");
     document.getElementById('maxTokens').value = data.maxTokens || 1000;
     document.getElementById('temperature').value = data.temperature || 0.7;
     document.getElementById('debug').checked = data.debug || false;
@@ -117,6 +117,39 @@ function saveSettings(event) {
       saveBtn.textContent = originalText;
     }, 1500);
   });
+}
+
+// Populate model dropdown with a safe list; preserve any custom stored value
+function populateModelSelect(selectedModel) {
+  const selectEl = modelInput;
+  if (!selectEl) return;
+
+  const models = [
+    { id: 'gpt-5-mini', label: 'gpt-5-mini (GPT-5 family)' },
+    { id: 'gpt-4o-mini', label: 'gpt-4o-mini (fast/cheap)' },
+    { id: 'gpt-4o', label: 'gpt-4o' }
+  ];
+
+  // Clear existing
+  selectEl.innerHTML = '';
+
+  // Add known models
+  models.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.id;
+    opt.textContent = m.label;
+    selectEl.appendChild(opt);
+  });
+
+  // If a stored/custom model isn't in the list, add it so it remains selectable
+  if (selectedModel && !models.some(m => m.id === selectedModel)) {
+    const customOpt = document.createElement('option');
+    customOpt.value = selectedModel;
+    customOpt.textContent = `${selectedModel} (custom)`;
+    selectEl.appendChild(customOpt);
+  }
+
+  selectEl.value = selectedModel || 'gpt-5-mini';
 }
 
 // Populate voice dropdown list

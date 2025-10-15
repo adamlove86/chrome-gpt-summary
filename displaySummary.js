@@ -148,7 +148,7 @@
 
     function tryLoadSummary() {
       chrome.storage.local.get(
-        ['latestSummary', 'summaryPageUrl', 'pageTitle', 'publishedDate', 'wordCount'],
+        ['latestSummary', 'summaryPageUrl', 'pageTitle', 'publishedDate', 'wordCount', 'modelUsed', 'fallbackReason'],
         (data) => {
           if (chrome.runtime.lastError) {
             logEvent(`Error retrieving summary data: ${chrome.runtime.lastError.message}`);
@@ -176,6 +176,8 @@
           const pageTitle = data.pageTitle || 'Summary';
           const publishedDate = data.publishedDate || 'Unknown';
           const wordCount = data.wordCount || 'Unknown';
+          const modelUsed = data.modelUsed || 'unknown';
+          const fallbackReason = data.fallbackReason || '';
 
           // Add Title
           const titleElement = document.createElement('h1');
@@ -189,6 +191,8 @@
           infoElement.innerHTML = `
             <p><strong>Published:</strong> ${formatDate(publishedDate)}</p>
             <p><strong>Original Length:</strong> ${wordCount} words</p>
+            <p><strong>Model:</strong> ${escapeHtml(modelUsed)}${fallbackReason ? ` (fallback)` : ''}</p>
+            ${fallbackReason ? `<p style="color:#e67e22;"><strong>Note:</strong> Fallback reason: ${escapeHtml(fallbackReason)}</p>` : ''}
             <p><strong>Original Page:</strong> <a href="${pageUrl}" target="_blank">${pageUrl}</a></p>
           `;
           sidebar.appendChild(infoElement);

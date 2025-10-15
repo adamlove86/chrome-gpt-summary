@@ -176,25 +176,67 @@ async function summariseText(text, pageUrl, contentType, pageTitle, publishedDat
 
     try {
       appendLog("Sending request to OpenAI API.");
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+
+      // Build request body for Chat Completions; switch token param for GPT-5 models
+      const isGpt5 = typeof model === 'string' && model.toLowerCase().startsWith('gpt-5');
+      let usedModel = model;
+      let fallbackReason = '';
+      const body = {
+        model: model,
+        messages: [
+          {
+            role: "system",
+            content: "You are a helpful assistant that creates well-formatted summaries. Always use proper markdown formatting including **bold** for important terms, *italics* for emphasis and headings, and proper line breaks between paragraphs and sections. Ensure your response maintains clear visual structure with proper spacing."
+          },
+          { role: "user", content: `${prompt}\n\n${text}` }
+        ],
+        temperature: temperature
+      };
+      if (isGpt5) {
+        // GPT-5 family expects max_completion_tokens
+        body.max_completion_tokens = maxTokens;
+      } else {
+        body.max_tokens = maxTokens;
+      }
+
+      let response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${apiKey}`
         },
-        body: JSON.stringify({
-          model: model,
-          messages: [
-            { 
-              "role": "system", 
-              "content": "You are a helpful assistant that creates well-formatted summaries. Always use proper markdown formatting including **bold** for important terms, *italics* for emphasis and headings, and proper line breaks between paragraphs and sections. Ensure your response maintains clear visual structure with proper spacing." 
-            },
-            { "role": "user", "content": `${prompt}\n\n${text}` }
-          ],
-          max_tokens: maxTokens,
-          temperature: temperature,
-        })
+        body: JSON.stringify(body)
       });
+
+      // If GPT-5 call fails due to unsupported model/param, fall back to gpt-4o-mini
+      if (!response.ok && isGpt5) {
+        const errText = await response.text();
+        appendLog("Primary GPT-5 request failed (" + response.status + "): " + errText);
+        // Fallback to gpt-4o-mini with max_tokens
+        const fallbackModel = 'gpt-4o-mini';
+        appendLog("Falling back to " + fallbackModel + ".");
+        usedModel = fallbackModel;
+        try {
+          const errJson = JSON.parse(errText);
+          fallbackReason = errJson && errJson.error && errJson.error.message ? errJson.error.message : ("HTTP " + response.status);
+        } catch (_) {
+          fallbackReason = ("HTTP " + response.status);
+        }
+        const fallbackBody = {
+          model: fallbackModel,
+          messages: body.messages,
+          max_tokens: maxTokens,
+          temperature: temperature
+        };
+        response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`
+          },
+          body: JSON.stringify(fallbackBody)
+        });
+      }
 
       const result = await response.json();
       appendLog("API response: " + JSON.stringify(result));
@@ -210,7 +252,9 @@ async function summariseText(text, pageUrl, contentType, pageTitle, publishedDat
           originalTextLength: wordCount,
           pageTitle: pageTitle,
           publishedDate: publishedDate,
-          wordCount: wordCount
+          wordCount: wordCount,
+          modelUsed: usedModel,
+          fallbackReason: fallbackReason
         }, () => {
           appendLog("Summary stored. Injecting displaySummary.js in tab " + tabId);
           chrome.scripting.executeScript({
