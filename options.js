@@ -1,6 +1,6 @@
 // options.js
 
-import { getDefaultYouTubePrompt, getDefaultTextPrompt } from './prompt.js';
+import { getDefaultYouTubePrompt, getDefaultTextPrompt, getDefaultPrefacePrompt, getDefaultYouTubePrefacePrompt } from './prompt.js';
 
 // --- Global Variables ---
 let availableVoices = [];
@@ -26,6 +26,8 @@ const temperatureInput = document.getElementById('temperature');
 const debugCheckbox = document.getElementById('debug');
 const youtubePromptTextarea = document.getElementById('youtubePrompt');
 const textPromptTextarea = document.getElementById('textPrompt');
+const prefacePromptTextarea = document.getElementById('prefacePrompt');
+const youtubePrefacePromptTextarea = document.getElementById('youtubePrefacePrompt');
 const defaultVoiceSelect = document.getElementById('defaultVoice');
 const speechSpeedRange = document.getElementById('speechSpeed');
 const speechSpeedValueSpan = document.getElementById('speechSpeedValue');
@@ -51,6 +53,8 @@ async function loadSettings() {
     debug: false,
     youtubePrompt: '',
     textPrompt: '',
+    prefacePrompt: '',
+    youtubePrefacePrompt: '',
     defaultVoice: '', // Will be populated by populateVoiceList
     speechSpeed: 100,
     blockedSites: [],
@@ -65,9 +69,13 @@ async function loadSettings() {
     // Load prompts from markdown files if not set in storage
     const youtubePrompt = data.youtubePrompt || await getDefaultYouTubePrompt();
     const textPrompt = data.textPrompt || await getDefaultTextPrompt();
+    const prefacePrompt = data.prefacePrompt || await getDefaultPrefacePrompt();
+    const youtubePrefacePrompt = data.youtubePrefacePrompt || await getDefaultYouTubePrefacePrompt();
     
     document.getElementById('youtubePrompt').value = youtubePrompt;
     document.getElementById('textPrompt').value = textPrompt;
+    document.getElementById('prefacePrompt').value = prefacePrompt;
+    document.getElementById('youtubePrefacePrompt').value = youtubePrefacePrompt;
     document.getElementById('speechSpeed').value = data.speechSpeed || 100;
     document.getElementById('speechSpeedValue').textContent = `${data.speechSpeed || 100}%`;
     document.getElementById('logLineLimit').value = data.logLineLimit || 30;
@@ -92,6 +100,8 @@ function saveSettings(event) {
   const debug = document.getElementById('debug').checked;
   const youtubePrompt = document.getElementById('youtubePrompt').value;
   const textPrompt = document.getElementById('textPrompt').value;
+  const prefacePrompt = document.getElementById('prefacePrompt').value;
+  const youtubePrefacePrompt = document.getElementById('youtubePrefacePrompt').value;
   const defaultVoice = document.getElementById('defaultVoice').value;
   const speechSpeed = parseInt(document.getElementById('speechSpeed').value, 10) || 100;
   const logLineLimit = parseInt(document.getElementById('logLineLimit').value, 10) || 30; // Keep log line limit
@@ -104,6 +114,8 @@ function saveSettings(event) {
     debug: debug,
     youtubePrompt: youtubePrompt,
     textPrompt: textPrompt,
+    prefacePrompt: prefacePrompt,
+    youtubePrefacePrompt: youtubePrefacePrompt,
     defaultVoice: defaultVoice,
     speechSpeed: speechSpeed,
     logLineLimit: logLineLimit // Save log line limit

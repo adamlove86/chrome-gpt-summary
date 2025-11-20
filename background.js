@@ -41,16 +41,45 @@ chrome.runtime.onInstalled.addListener(() => {
   // Optionally, clear log on install/update.
   // chrome.storage.local.set({ debugLog: "" });
   startNewSession();
+  // Primary summarisation context menu
   chrome.contextMenus.create({
     id: "summarise",
     title: "Summarise with ChatGPT",
     contexts: ["page", "selection", "link"]
-  }, function() {
+  }, () => {
     if (chrome.runtime.lastError) {
-      appendLog("Context menu creation failed: " + chrome.runtime.lastError.message);
-      console.error("Context menu creation failed: " + chrome.runtime.lastError.message);
+      appendLog("Context menu 'summarise' creation failed: " + chrome.runtime.lastError.message);
+      console.error("Context menu 'summarise' creation failed: " + chrome.runtime.lastError.message);
     } else {
-      appendLog("Context menu created successfully.");
+      appendLog("Context menu 'summarise' created successfully.");
+    }
+  });
+
+  // Article reading (full-page) context menu – only meaningful on article pages
+  chrome.contextMenus.create({
+    id: "read_article",
+    title: "🔊 Read Article (TTS)",
+    contexts: ["page"]
+  }, () => {
+    if (chrome.runtime.lastError) {
+      appendLog("Context menu 'read_article' creation failed: " + chrome.runtime.lastError.message);
+      console.error("Context menu 'read_article' creation failed: " + chrome.runtime.lastError.message);
+    } else {
+      appendLog("Context menu 'read_article' created successfully.");
+    }
+  });
+
+  // Selected-text reading context menu
+  chrome.contextMenus.create({
+    id: "read_selection",
+    title: "🔊 Read Selected Text (TTS)",
+    contexts: ["selection"]
+  }, () => {
+    if (chrome.runtime.lastError) {
+      appendLog("Context menu 'read_selection' creation failed: " + chrome.runtime.lastError.message);
+      console.error("Context menu 'read_selection' creation failed: " + chrome.runtime.lastError.message);
+    } else {
+      appendLog("Context menu 'read_selection' created successfully.");
     }
   });
 });
@@ -89,6 +118,40 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       if (tab && tab.id) {
         chrome.tabs.sendMessage(tab.id, { action: "displayError", error: error.message });
       }
+    }
+  } else if (info.menuItemId === "read_article") {
+    try {
+      if (!tab || !tab.id) {
+        appendLog("read_article invoked without valid tab.");
+        return;
+      }
+      // Skip YouTube – this feature is intended for articles
+      if (tab.url && tab.url.includes('youtube.com/watch')) {
+        appendLog("read_article invoked on YouTube page; ignoring.");
+        return;
+      }
+      appendLog("Initiating full-article TTS from context menu for tab " + tab.id);
+      await readArticleInTab(tab);
+    } catch (error) {
+      appendLog("Error in read_article handler: " + error.message);
+      console.error("Error in read_article handler:", error);
+    }
+  } else if (info.menuItemId === "read_selection") {
+    try {
+      if (!tab || !tab.id) {
+        appendLog("read_selection invoked without valid tab.");
+        return;
+      }
+      const text = (info.selectionText || '').trim();
+      if (!text) {
+        appendLog("read_selection invoked with empty selection; ignoring.");
+        return;
+      }
+      appendLog("Initiating selected-text TTS from context menu for tab " + tab.id);
+      await readSelectionInTab(text, tab);
+    } catch (error) {
+      appendLog("Error in read_selection handler: " + error.message);
+      console.error("Error in read_selection handler:", error);
     }
   }
 });
@@ -254,7 +317,8 @@ async function summariseText(text, pageUrl, contentType, pageTitle, publishedDat
           publishedDate: publishedDate,
           wordCount: wordCount,
           modelUsed: usedModel,
-          fallbackReason: fallbackReason
+        fallbackReason: fallbackReason,
+        summaryType: 'summary' // Explicitly mark this sidebar content as a summary (not article)
         }, () => {
           appendLog("Summary stored. Injecting displaySummary.js in tab " + tabId);
           chrome.scripting.executeScript({
@@ -324,6 +388,100 @@ async function downloadLogFile() {
         reject(new Error("Error reading blob as data URL"));
       };
       reader.readAsDataURL(blob);
+    });
+  });
+}
+
+// --- Helpers for TTS-style reading from context menus (no OpenAI calls) ---
+
+async function readArticleInTab(tab) {
+  appendLog("readArticleInTab: Starting for tab " + tab.id + " (" + tab.url + ")");
+  // Inject content extraction scripts
+  await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    files: ['JSDOMParser.js', 'Readability.js', 'contentScript.js']
+  });
+
+  // Wrap sendMessage in a Promise for cleaner async/await
+  const response = await new Promise((resolve) => {
+    try {
+      chrome.tabs.sendMessage(
+        tab.id,
+        { action: "getContentAndMetadata" },
+        (resp) => {
+          if (chrome.runtime.lastError) {
+            appendLog("readArticleInTab: sendMessage error: " + chrome.runtime.lastError.message);
+            resolve({ error: chrome.runtime.lastError.message });
+          } else {
+            resolve(resp);
+          }
+        }
+      );
+    } catch (e) {
+      appendLog("readArticleInTab: Exception during sendMessage: " + e.message);
+      resolve({ error: e.message });
+    }
+  });
+
+  if (!response || response.error || response.action === "contentError") {
+    const errMsg = response && response.error ? response.error : 'Unknown content extraction error';
+    appendLog("readArticleInTab: Content extraction failed: " + errMsg);
+    displayError("Failed to extract article content for reading: " + errMsg, tab.url, tab.id);
+    return;
+  }
+
+  if (response.action === "contentData") {
+    const { content, title, publishedDate, url } = response;
+    if (!content || !content.trim()) {
+      appendLog("readArticleInTab: No content returned from content script.");
+      displayError("No article content available to read.", tab.url, tab.id);
+      return;
+    }
+
+    const wordCount = content.trim().split(/\s+/).length;
+    appendLog("readArticleInTab: Storing full-article content for TTS. Words: " + wordCount);
+
+    chrome.storage.local.set({
+      latestFullContent: content,
+      fullContentPageUrl: url || tab.url || '',
+      fullContentPageTitle: title || tab.title || 'Article',
+      fullContentPublishedDate: publishedDate || 'Unknown',
+      fullContentWordCount: wordCount,
+      summaryType: 'article'
+    }, () => {
+      appendLog("readArticleInTab: Full content stored. Injecting displaySummary.js.");
+      chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['displaySummary.js']
+      });
+    });
+  } else {
+    appendLog("readArticleInTab: Unexpected response from content script: " + JSON.stringify(response));
+  }
+}
+
+async function readSelectionInTab(text, tab) {
+  const cleanText = (text || '').trim();
+  if (!cleanText) {
+    appendLog("readSelectionInTab: Empty selection; aborting.");
+    return;
+  }
+
+  const wordCount = cleanText.split(/\s+/).length;
+  appendLog("readSelectionInTab: Storing selected text for TTS. Words: " + wordCount);
+
+  chrome.storage.local.set({
+    latestFullContent: cleanText,
+    fullContentPageUrl: tab.url || '',
+    fullContentPageTitle: (tab.title || 'Selected Text'),
+    fullContentPublishedDate: 'Unknown',
+    fullContentWordCount: wordCount,
+    summaryType: 'article'
+  }, () => {
+    appendLog("readSelectionInTab: Selection stored. Injecting displaySummary.js.");
+    chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['displaySummary.js']
     });
   });
 }

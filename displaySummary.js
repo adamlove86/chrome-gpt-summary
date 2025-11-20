@@ -148,7 +148,22 @@
 
     function tryLoadSummary() {
       chrome.storage.local.get(
-        ['latestSummary', 'summaryPageUrl', 'pageTitle', 'publishedDate', 'wordCount', 'modelUsed', 'fallbackReason'],
+        [
+          'latestSummary',
+          'summaryPageUrl',
+          'pageTitle',
+          'publishedDate',
+          'wordCount',
+          'modelUsed',
+          'fallbackReason',
+          // Full-article / mode-specific keys
+          'latestFullContent',
+          'fullContentPageUrl',
+          'fullContentPageTitle',
+          'fullContentPublishedDate',
+          'fullContentWordCount',
+          'summaryType'
+        ],
         (data) => {
           if (chrome.runtime.lastError) {
             logEvent(`Error retrieving summary data: ${chrome.runtime.lastError.message}`);
@@ -156,11 +171,19 @@
             return;
           }
 
-          // Check if we have a valid summary
-          if (!data.latestSummary || data.latestSummary === 'No summary available.') {
+          // Determine which mode we are in; default to 'summary' for backwards compatibility
+          const mode = data.summaryType === 'article' ? 'article' : 'summary';
+          const isArticleMode = mode === 'article';
+
+          // Check if we have valid content for the requested mode
+          const hasContent = isArticleMode
+            ? !!(data.latestFullContent && data.latestFullContent.trim() !== '')
+            : !!(data.latestSummary && data.latestSummary !== 'No summary available.');
+
+          if (!hasContent) {
             if (retryCount < maxRetries) {
               retryCount++;
-              logEvent(`No summary available yet, retrying in 1 second (attempt ${retryCount}/${maxRetries})...`);
+              logEvent(`No sidebar content available yet, retrying in 1 second (attempt ${retryCount}/${maxRetries})...`);
               setTimeout(tryLoadSummary, 1000);
               return;
             } else {
@@ -170,18 +193,41 @@
             }
           }
 
-          logEvent("Retrieved summary data from storage.");
-          const summary = data.latestSummary;
-          const pageUrl = data.summaryPageUrl || '#';
-          const pageTitle = data.pageTitle || 'Summary';
-          const publishedDate = data.publishedDate || 'Unknown';
-          const wordCount = data.wordCount || 'Unknown';
-          const modelUsed = data.modelUsed || 'unknown';
-          const fallbackReason = data.fallbackReason || '';
+          logEvent(`Retrieved sidebar data from storage. Mode: ${mode}`);
+
+          // Derive values depending on whether we're showing an AI summary or full article text
+          const isArticle = isArticleMode;
+
+          const summary = isArticle
+            ? (data.latestFullContent || '')
+            : (data.latestSummary || '');
+
+          const pageUrl = isArticle
+            ? (data.fullContentPageUrl || data.summaryPageUrl || '#')
+            : (data.summaryPageUrl || '#');
+
+          const pageTitle = isArticle
+            ? (data.fullContentPageTitle || data.pageTitle || 'Article')
+            : (data.pageTitle || 'Summary');
+
+          const publishedDate = isArticle
+            ? (data.fullContentPublishedDate || data.publishedDate || 'Unknown')
+            : (data.publishedDate || 'Unknown');
+
+          const wordCount = isArticle
+            ? (data.fullContentWordCount || (summary ? summary.trim().split(/\s+/).length : 'Unknown'))
+            : (data.wordCount || 'Unknown');
+
+          const modelUsed = isArticle
+            ? 'Full article (no AI model)'
+            : (data.modelUsed || 'unknown');
+
+          const fallbackReason = isArticle ? '' : (data.fallbackReason || '');
 
           // Add Title
           const titleElement = document.createElement('h1');
-          titleElement.textContent = `${pageTitle} - Summary`;
+          const titleSuffix = isArticle ? 'Article Reader' : 'Summary';
+          titleElement.textContent = `${pageTitle} - ${titleSuffix}`;
           titleElement.id = 'summary-sidebar-title';
           sidebar.appendChild(titleElement);
 
@@ -191,16 +237,17 @@
           infoElement.innerHTML = `
             <p><strong>Published:</strong> ${formatDate(publishedDate)}</p>
             <p><strong>Original Length:</strong> ${wordCount} words</p>
-            <p><strong>Model:</strong> ${escapeHtml(modelUsed)}${fallbackReason ? ` (fallback)` : ''}</p>
-            ${fallbackReason ? `<p style="color:#e67e22;"><strong>Note:</strong> Fallback reason: ${escapeHtml(fallbackReason)}</p>` : ''}
+            <p><strong>Mode:</strong> ${isArticle ? 'Article (full text, read-only)' : 'Summary (AI-generated)'}</p>
+            ${!isArticle ? `<p><strong>Model:</strong> ${escapeHtml(modelUsed)}${fallbackReason ? ` (fallback)` : ''}</p>` : ''}
+            ${!isArticle && fallbackReason ? `<p style="color:#e67e22;"><strong>Note:</strong> Fallback reason: ${escapeHtml(fallbackReason)}</p>` : ''}
             <p><strong>Original Page:</strong> <a href="${pageUrl}" target="_blank">${pageUrl}</a></p>
           `;
           sidebar.appendChild(infoElement);
 
           // Add "Open TTS" button
           openTTSButton = document.createElement('button');
-          openTTSButton.innerText = '🔊 Read Summary';
-          openTTSButton.setAttribute('aria-label', 'Open Text-to-Speech Controls');
+          openTTSButton.innerText = isArticle ? '🔊 Read Article' : '🔊 Read Summary';
+          openTTSButton.setAttribute('aria-label', isArticle ? 'Open Article Text-to-Speech Controls' : 'Open Text-to-Speech Controls');
           openTTSButton.id = 'summary-sidebar-open-tts-btn';
           openTTSButton.addEventListener('click', () => {
               if(ttsContainer) ttsContainer.style.display = 'block';

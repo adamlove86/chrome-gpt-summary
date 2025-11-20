@@ -6,6 +6,7 @@ const summariseBtn = document.getElementById('summariseBtn');
 const blockSiteBtn = document.getElementById('blockSiteBtn');
 const optionsBtn = document.getElementById('optionsBtn');
 const copyTranscriptBtn = document.getElementById('copyTranscriptBtn');
+const readContentBtn = document.getElementById('readContentBtn');
 const copyContentBtn = document.getElementById('copyContentBtn');
 const sendToChatGPTBtn = document.getElementById('sendToChatGPTBtn');
 const factCheckBtn = document.getElementById('factCheckBtn');
@@ -39,6 +40,9 @@ function initializePopup() {
       // Show copy content button for non-YouTube pages (excluding chrome internal pages)
       if (copyContentBtn) {
         copyContentBtn.style.display = 'block'; // Show the button (use block for column layout)
+      }
+      if (readContentBtn) {
+        readContentBtn.style.display = 'block'; // Show for article pages
       }
       if (sendToChatGPTBtn) {
         sendToChatGPTBtn.style.display = 'block'; // Show for articles
@@ -221,6 +225,83 @@ if (copyTranscriptBtn) {
   });
 }
 
+// Listener for the Read Article button (opens sidebar TTS reader for full article content)
+if (readContentBtn) {
+  readContentBtn.addEventListener('click', async () => {
+    handleButtonPress('readContentBtn');
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+      const currentTab = tabs[0];
+      if (currentTab && currentTab.id) {
+        try {
+          // Ensure necessary scripts are injected
+          await chrome.scripting.executeScript({
+            target: { tabId: currentTab.id },
+            files: ['JSDOMParser.js', 'Readability.js', 'contentScript.js']
+          });
+
+          // Request content and metadata from content script
+          chrome.tabs.sendMessage(
+            currentTab.id,
+            { action: "getContentAndMetadata" },
+            (response) => {
+              if (chrome.runtime.lastError) {
+                console.error("Error sending message:", chrome.runtime.lastError.message);
+                readContentBtn.textContent = 'Error!';
+                setTimeout(() => (readContentBtn.textContent = '🔊 Read Article'), 2000);
+                return;
+              }
+
+              if (response && response.action === "contentData") {
+                const { content, title, publishedDate, url } = response;
+                if (content) {
+                  const wordCount = content.trim().split(/\s+/).length;
+
+                  // Store full-article data and mark sidebar mode as article
+                  chrome.storage.local.set(
+                    {
+                      latestFullContent: content,
+                      fullContentPageUrl: url,
+                      fullContentPageTitle: title,
+                      fullContentPublishedDate: publishedDate,
+                      fullContentWordCount: wordCount,
+                      summaryType: 'article'
+                    },
+                    () => {
+                      // Inject the same sidebar/tts reader used for summaries
+                      chrome.scripting.executeScript({
+                        target: { tabId: currentTab.id },
+                        files: ['displaySummary.js']
+                      });
+                      readContentBtn.textContent = 'Opening...';
+                      setTimeout(() => (readContentBtn.textContent = '🔊 Read Article'), 2000);
+                    }
+                  );
+                } else {
+                  console.error('No content received from content script.');
+                  readContentBtn.textContent = 'No Content!';
+                  setTimeout(() => (readContentBtn.textContent = '🔊 Read Article'), 2000);
+                }
+              } else if (response && response.action === "contentError") {
+                console.error("Error fetching content:", response.error);
+                readContentBtn.textContent = 'Error!';
+                setTimeout(() => (readContentBtn.textContent = '🔊 Read Article'), 2000);
+              } else {
+                console.error('Unexpected response from content script:', response);
+                readContentBtn.textContent = 'Error!';
+                setTimeout(() => (readContentBtn.textContent = '🔊 Read Article'), 2000);
+              }
+            }
+          );
+        } catch (error) {
+          console.error("Error during article read process:", error);
+          readContentBtn.textContent = 'Error!';
+          setTimeout(() => (readContentBtn.textContent = '🔊 Read Article'), 2000);
+        }
+      }
+    });
+  });
+}
+
 // Listener for the Copy Content button
 if (copyContentBtn) {
   copyContentBtn.addEventListener('click', async () => {
@@ -287,106 +368,110 @@ if (copyContentBtn) {
 if (sendToChatGPTBtn) {
   sendToChatGPTBtn.addEventListener('click', async () => {
     handleButtonPress('sendToChatGPTBtn');
-    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-      const currentTab = tabs[0];
-      if (currentTab && currentTab.id) {
-        // Determine if this is YouTube or article page
-        const isYouTube = currentTab.url && currentTab.url.includes('youtube.com/watch');
-        
-        try {
-          if (isYouTube) {
-            // YouTube: inject and get transcript
-            await chrome.scripting.executeScript({
-              target: { tabId: currentTab.id },
-              files: ['youtubeTranscript.js']
-            });
-            chrome.tabs.sendMessage(currentTab.id, { action: "getTranscriptAndMetadata" }, (response) => {
-              if (chrome.runtime.lastError) {
-                console.error("Error sending message:", chrome.runtime.lastError.message);
-                sendToChatGPTBtn.textContent = 'Error!';
-                setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
-                return;
-              }
-              if (response && response.action === "transcriptData") {
-                const { transcript, title, channel, date, url } = response;
-                if (transcript) {
-                  const wordCount = transcript.trim().split(/\s+/).length;
-                  const header = `Title: ${title || 'N/A'}\nChannel: ${channel || 'N/A'}\nPublished: ${date || 'N/A'}\nURL: ${url || 'N/A'}\nWord Count: ${wordCount}\n\n---\n\n`;
-                  const preface = "I have questions about this YouTube video. Please review the text below.\n\n";
-                  const fullText = preface + header + transcript;
-                  
-                  // Send to background to open ChatGPT
-                  chrome.runtime.sendMessage({ 
-                    action: "openChatGPTWithText", 
-                    text: fullText 
-                  });
-                  sendToChatGPTBtn.textContent = 'Opening...';
-                  setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
-                } else {
-                  console.error('No transcript received from content script.');
-                  sendToChatGPTBtn.textContent = 'No Transcript!';
-                  setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
+
+    chrome.storage.sync.get({
+        prefacePrompt: "I have questions about this article. Please review the complete text provided below. The full article content is included here, so you don't need to access any external links right now.",
+        youtubePrefacePrompt: "I have questions about this YouTube video. Please review the text below."
+    }, (settings) => {
+        chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+            const currentTab = tabs[0];
+            if (currentTab && currentTab.id) {
+                // Determine if this is YouTube or article page
+                const isYouTube = currentTab.url && currentTab.url.includes('youtube.com/watch');
+
+                try {
+                    if (isYouTube) {
+                        // YouTube: inject and get transcript
+                        await chrome.scripting.executeScript({
+                            target: { tabId: currentTab.id },
+                            files: ['youtubeTranscript.js']
+                        });
+                        chrome.tabs.sendMessage(currentTab.id, { action: "getTranscriptAndMetadata" }, (response) => {
+                            if (chrome.runtime.lastError) {
+                                console.error("Error sending message:", chrome.runtime.lastError.message);
+                                sendToChatGPTBtn.textContent = 'Error!';
+                                setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
+                                return;
+                            }
+                            if (response && response.action === "transcriptData") {
+                                const { transcript, title, channel, date, url } = response;
+                                if (transcript) {
+                                    const wordCount = transcript.trim().split(/\s+/).length;
+                                    const header = `Title: ${title || 'N/A'}\nChannel: ${channel || 'N/A'}\nPublished: ${date || 'N/A'}\nURL: ${url || 'N/A'}\nWord Count: ${wordCount}\n\n---\n\n`;
+                                    const fullText = `${settings.youtubePrefacePrompt}\n\n` + header + transcript;
+
+                                    // Send to background to open ChatGPT
+                                    chrome.runtime.sendMessage({
+                                        action: "openChatGPTWithText",
+                                        text: fullText
+                                    });
+                                    sendToChatGPTBtn.textContent = 'Opening...';
+                                    setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
+                                } else {
+                                    console.error('No transcript received from content script.');
+                                    sendToChatGPTBtn.textContent = 'No Transcript!';
+                                    setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
+                                }
+                            } else if (response && response.action === "transcriptError") {
+                                console.error("Error fetching transcript:", response.error);
+                                sendToChatGPTBtn.textContent = 'Error!';
+                                setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
+                            } else {
+                                console.error('Unexpected response from content script:', response);
+                                sendToChatGPTBtn.textContent = 'Error!';
+                                setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
+                            }
+                        });
+                    } else {
+                        // Article: inject and get content
+                        await chrome.scripting.executeScript({
+                            target: { tabId: currentTab.id },
+                            files: ['JSDOMParser.js', 'Readability.js', 'contentScript.js']
+                        });
+                        chrome.tabs.sendMessage(currentTab.id, { action: "getContentAndMetadata" }, (response) => {
+                            if (chrome.runtime.lastError) {
+                                console.error("Error sending message:", chrome.runtime.lastError.message);
+                                sendToChatGPTBtn.textContent = 'Error!';
+                                setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
+                                return;
+                            }
+                            if (response && response.action === "contentData") {
+                                const { content, title, publishedDate, url } = response;
+                                if (content) {
+                                    const wordCount = content.trim().split(/\s+/).length;
+                                    const header = `Title: ${title || 'N/A'}\nPublished: ${publishedDate || 'N/A'}\nURL: ${url || 'N/A'}\nWord Count: ${wordCount}\n\n---\n\n`;
+                                    const fullText = `${settings.prefacePrompt}\n\n` + header + content;
+
+                                    // Send to background to open ChatGPT
+                                    chrome.runtime.sendMessage({
+                                        action: "openChatGPTWithText",
+                                        text: fullText
+                                    });
+                                    sendToChatGPTBtn.textContent = 'Opening...';
+                                    setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
+                                } else {
+                                    console.error('No content received from content script.');
+                                    sendToChatGPTBtn.textContent = 'No Content!';
+                                    setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
+                                }
+                            } else if (response && response.action === "contentError") {
+                                console.error("Error fetching content:", response.error);
+                                sendToChatGPTBtn.textContent = 'Error!';
+                                setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
+                            } else {
+                                console.error('Unexpected response from content script:', response);
+                                sendToChatGPTBtn.textContent = 'Error!';
+                                setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
+                            }
+                        });
+                    }
+                } catch (error) {
+                    console.error("Error during ChatGPT send process:", error);
+                    sendToChatGPTBtn.textContent = 'Error!';
+                    setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
                 }
-              } else if (response && response.action === "transcriptError") {
-                console.error("Error fetching transcript:", response.error);
-                sendToChatGPTBtn.textContent = 'Error!';
-                setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
-              } else {
-                console.error('Unexpected response from content script:', response);
-                sendToChatGPTBtn.textContent = 'Error!';
-                setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
-              }
-            });
-          } else {
-            // Article: inject and get content
-            await chrome.scripting.executeScript({
-              target: { tabId: currentTab.id },
-              files: ['JSDOMParser.js', 'Readability.js', 'contentScript.js']
-            });
-            chrome.tabs.sendMessage(currentTab.id, { action: "getContentAndMetadata" }, (response) => {
-              if (chrome.runtime.lastError) {
-                console.error("Error sending message:", chrome.runtime.lastError.message);
-                sendToChatGPTBtn.textContent = 'Error!';
-                setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
-                return;
-              }
-              if (response && response.action === "contentData") {
-                const { content, title, publishedDate, url } = response;
-                if (content) {
-                  const wordCount = content.trim().split(/\s+/).length;
-                  const header = `Title: ${title || 'N/A'}\nPublished: ${publishedDate || 'N/A'}\nURL: ${url || 'N/A'}\nWord Count: ${wordCount}\n\n---\n\n`;
-                  const preface = "I have questions about this article. Please review the text below.\n\n";
-                  const fullText = preface + header + content;
-                  
-                  // Send to background to open ChatGPT
-                  chrome.runtime.sendMessage({ 
-                    action: "openChatGPTWithText", 
-                    text: fullText 
-                  });
-                  sendToChatGPTBtn.textContent = 'Opening...';
-                  setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
-                } else {
-                  console.error('No content received from content script.');
-                  sendToChatGPTBtn.textContent = 'No Content!';
-                  setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
-                }
-              } else if (response && response.action === "contentError") {
-                console.error("Error fetching content:", response.error);
-                sendToChatGPTBtn.textContent = 'Error!';
-                setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
-              } else {
-                console.error('Unexpected response from content script:', response);
-                sendToChatGPTBtn.textContent = 'Error!';
-                setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
-              }
-            });
-          }
-        } catch (error) {
-          console.error("Error during ChatGPT send process:", error);
-          sendToChatGPTBtn.textContent = 'Error!';
-          setTimeout(() => sendToChatGPTBtn.textContent = '💬 Send to ChatGPT', 2000);
-        }
-      }
+            }
+        });
     });
   });
 }

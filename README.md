@@ -16,12 +16,17 @@ A Chrome extension that summarises web pages, selected text, and YouTube transcr
 - **Copy to Clipboard:**
   - Copy YouTube transcripts with metadata (title, channel, date, word count).
   - Copy article content with metadata (title, published date, URL, word count).
+- **Article & Text Reading (Text-to-Speech):**
+  - Read full articles aloud in a sidebar with playback controls.
+  - Read only highlighted text aloud using the same on-page reader.
+- **Context Menu Integration:**
+  - Summarise the current page or highlighted text via right-click.
+  - Read full articles or selected text aloud via right-click TTS options.
 - **Configurable Summarization:**
   - Choose the OpenAI model (e.g., `gpt-4o-mini`, `gpt-4`, etc.).
   - Set maximum tokens for the summary.
   - Adjust the creativity/randomness using the temperature setting.
   - Define custom system prompts for both general text and YouTube transcript summarization.
-- **Context Menu Integration:** Access summarization options by right-clicking on a page, selected text, or a link (link summarization currently not implemented).
 - **Site Blocker:** Maintain a list of website origins (e.g., `https://www.example.com`) to block. When visiting a blocked site, the extension attempts to stop the page load. Add sites to the blocklist via the popup or options page.
 - **API Key Management:** Securely store your OpenAI API key in Chrome's sync storage or load it locally from a `key.txt` file (useful for development, ignored by `.gitignore`).
 - **Debug Logging:** Maintains a detailed log of actions in local storage, which can be downloaded from the options page for troubleshooting.
@@ -75,6 +80,20 @@ A Chrome extension that summarises web pages, selected text, and YouTube transcr
     - Highlight the text you want to summarize on any web page.
     - Right-click on the selected text.
     - Choose "Summarise with ChatGPT" from the context menu.
+
+### Reading Articles and Highlighted Text (TTS)
+
+3.  **Read Full Article Aloud (Popup):**
+    - Navigate to an article page (non-YouTube).
+    - Click the extension icon.
+    - Click **🔊 Read Article** to open the sidebar reader and listen to the full article text.
+4.  **Read Full Article Aloud (Right-Click):**
+    - On an article page, right-click anywhere on the page (not on a link or selected text).
+    - Choose **"🔊 Read Article (TTS)"** from the context menu.
+5.  **Read Highlighted Text Aloud (Right-Click):**
+    - Highlight any text on a page.
+    - Right-click on the selection.
+    - Choose **"🔊 Read Selected Text (TTS)"** to open the sidebar reader for just that selection.
 
 ### ChatGPT Integration
 

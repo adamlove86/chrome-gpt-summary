@@ -1,7 +1,9 @@
 // Cache for loaded prompts
 let promptCache = {
   youtube: null,
-  text: null
+  text: null,
+  preface: null,
+  youtubePreface: null
 };
 
 // Function to load markdown file content
@@ -110,8 +112,40 @@ async function getDefaultTextPrompt() {
 Remember: The goal is to create an easily scannable, well-formatted summary that is both informative and pleasant to read.`;
 }
 
+// Load preface prompt from markdown file
+async function getDefaultPrefacePrompt() {
+    if (promptCache.preface) {
+        return promptCache.preface;
+    }
+
+    const content = await loadMarkdownFile('preface-prompt.md');
+    if (content) {
+        promptCache.preface = content.trim();
+        return promptCache.preface;
+    }
+
+    // Fallback to hardcoded prompt if file loading fails
+    return "I have questions about this article. Please review the complete text provided below. The full article content is included here, so you don't need to access any external links right now.";
+}
+
+// Load YouTube preface prompt from markdown file
+async function getDefaultYouTubePrefacePrompt() {
+    if (promptCache.youtubePreface) {
+        return promptCache.youtubePreface;
+    }
+
+    const content = await loadMarkdownFile('youtube-preface-prompt.md');
+    if (content) {
+        promptCache.youtubePreface = content.trim();
+        return promptCache.youtubePreface;
+    }
+
+    // Fallback to hardcoded prompt if file loading fails
+    return "I have questions about this YouTube video. Please review the text below.";
+}
+
 // Export functions to use in other files
-export { getDefaultYouTubePrompt, getDefaultTextPrompt };
+export { getDefaultYouTubePrompt, getDefaultTextPrompt, getDefaultPrefacePrompt, getDefaultYouTubePrefacePrompt };
  
 
  
