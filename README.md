@@ -1,6 +1,6 @@
 # Summarise with GPT-4o-mini Chrome Extension
 
-A Chrome extension that summarises web pages, selected text, and YouTube transcripts using the OpenAI API (defaulting to GPT-4o-mini). It also includes ChatGPT integration for asking questions and fact-checking, plus a simple site blocker feature. This plugin is designed to help you quickly generate concise or detailed summaries and verify information directly in your browser.
+A Chrome extension that summarises web pages, selected text, and YouTube transcripts using the OpenAI API (defaulting to GPT-4o-mini). It also includes ChatGPT integration for asking questions and fact-checking, plus a simple paywall blocker feature. This plugin is designed to help you quickly generate concise or detailed summaries and verify information directly in your browser.
 
 ![Extension Popup](summarise.png)
 
