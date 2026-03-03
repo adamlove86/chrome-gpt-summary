@@ -18,9 +18,18 @@ const PAYWALL_SELECTORS = [
 const BOOTSTRAP_SCRIPT_PATTERNS = [
   "cdn.tinypass.com/api/tinypass.min.js",
   "tinypass",
-  "piano",
-  "piano.io",
-  "tp.piano"
+  "tp.piano",
+  "/piano/",
+  "experience.piano"
+];
+
+const PAYWALL_REQUEST_PATTERNS = [
+  "paywallbypassmemberdetailsquery",
+  "memberandsubscriptionsdetailsquery",
+  "paywallbypass(",
+  "paywallbypassinput",
+  "graphql?query=query%20paywall",
+  "graphql?query=query%20memberandsubscriptions"
 ];
 
 function ensureBypassStyle() {
@@ -79,6 +88,10 @@ function hasContentShell() {
   return Boolean(document.body && (document.querySelector("article") || document.querySelector("main")));
 }
 
+function hasBasicShell() {
+  return Boolean(document.body && document.documentElement);
+}
+
 function hasBootstrapScriptInDom() {
   const scripts = document.querySelectorAll("script[src]");
   for (const script of scripts) {
@@ -108,6 +121,61 @@ function isBootstrapScriptNode(node) {
   return BOOTSTRAP_SCRIPT_PATTERNS.some((pattern) => src.includes(pattern));
 }
 
+function normalizeUrlForMatch(url) {
+  try {
+    return decodeURIComponent(String(url || "").toLowerCase());
+  } catch {
+    return String(url || "").toLowerCase();
+  }
+}
+
+function shouldBlockPaywallRequest(url) {
+  const normalized = normalizeUrlForMatch(url);
+  if (!normalized) {
+    return false;
+  }
+  return PAYWALL_REQUEST_PATTERNS.some((pattern) => normalized.includes(pattern));
+}
+
+function installRequestBlockers(currentOrigin) {
+  if (window.__popupBlockerRequestHooksInstalled) {
+    return;
+  }
+  window.__popupBlockerRequestHooksInstalled = true;
+
+  const originalFetch = window.fetch;
+  if (typeof originalFetch === "function") {
+    window.fetch = function (...args) {
+      const request = args[0];
+      const url = typeof request === "string" ? request : request?.url;
+      if (shouldBlockPaywallRequest(url)) {
+        console.log(`[Popup Blocker] Blocked paywall fetch for ${currentOrigin}: ${url}`);
+        // Keep the caller waiting to avoid triggering fallback paywall routes.
+        return new Promise(() => {});
+      }
+      return originalFetch.apply(this, args);
+    };
+  }
+
+  const originalOpen = XMLHttpRequest.prototype.open;
+  const originalSend = XMLHttpRequest.prototype.send;
+
+  XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+    this.__popupBlockerUrl = String(url || "");
+    this.__popupBlockerShouldBlock = shouldBlockPaywallRequest(this.__popupBlockerUrl);
+    return originalOpen.call(this, method, url, ...rest);
+  };
+
+  XMLHttpRequest.prototype.send = function (...args) {
+    if (this.__popupBlockerShouldBlock) {
+      console.log(`[Popup Blocker] Blocked paywall XHR for ${currentOrigin}: ${this.__popupBlockerUrl}`);
+      // Intentionally do not send this request.
+      return;
+    }
+    return originalSend.apply(this, args);
+  };
+}
+
 function stopNearPaywallBootstrap(currentOrigin) {
   const maxWaitMs = 5000;
   const startedAt = Date.now();
@@ -126,7 +194,7 @@ function stopNearPaywallBootstrap(currentOrigin) {
 
   const maybeStop = (reason) => {
     // Prefer stopping close to paywall bootstrap to avoid both white pages and late 404 overlays.
-    if (sawBootstrapScript && (hasContentShell() || document.readyState !== "loading")) {
+    if (sawBootstrapScript && hasBasicShell()) {
       stopNow(reason);
       return true;
     }
@@ -183,7 +251,7 @@ function stopNearPaywallBootstrap(currentOrigin) {
     }
 
     if (maybeStop("poll")) {
-      scriptObserver.disconnect();
+      signalObserver.disconnect();
       return;
     }
 
@@ -207,6 +275,18 @@ function stopNearPaywallBootstrap(currentOrigin) {
 }
 
 function startBlockedSiteHandling(currentOrigin) {
+  const initialStopDeadlineMs = Date.now() + 1200;
+  const initialStop = () => {
+    if (document.body || Date.now() >= initialStopDeadlineMs) {
+      console.log(`[Popup Blocker] Initial early stop for ${currentOrigin}`);
+      window.stop();
+      return;
+    }
+    setTimeout(initialStop, 40);
+  };
+  initialStop();
+
+  installRequestBlockers(currentOrigin);
   ensureBypassStyle();
   unlockPageScroll();
   neutralizePaywallElements();

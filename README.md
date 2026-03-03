@@ -27,7 +27,7 @@ A Chrome extension that summarises web pages, selected text, and YouTube transcr
   - Set maximum tokens for the summary.
   - Adjust the creativity/randomness using the temperature setting.
   - Define custom system prompts for both general text and YouTube transcript summarization.
-- **Site Blocker:** Maintain a list of website origins (e.g., `https://www.example.com`) to block. When visiting a blocked site, the extension attempts to stop the page load. Add sites to the blocklist via the popup or options page.
+- **Site Blocker (paywall bypass):** Maintain a list of website origins to block. On blocked sites the extension: stops the page load early (once the body exists) so paywall scripts do not complete; blocks known paywall API requests (e.g. GraphQL member/paywall queries) via `fetch` and XHR hooks; and hides common paywall overlay elements. Add origins via the popup or options page. Works best on sites that use Tinypass/Piano-style paywalls; effectiveness depends on site structure.
 - **API Key Management:** Securely store your OpenAI API key in Chrome's sync storage or load it locally from a `key.txt` file (useful for development, ignored by `.gitignore`).
 - **Debug Logging:** Maintains a detailed log of actions in local storage, which can be downloaded from the options page for troubleshooting.
 - **Summary Display:** Shows summaries in a clean overlay on the current page, including metadata like original word count and estimated read time.
@@ -132,7 +132,7 @@ A Chrome extension that summarises web pages, selected text, and YouTube transcr
 ## Development Notes
 
 - The extension uses a background service worker (`background.js`) for handling API calls, context menus, and message passing.
-- Content scripts (`contentScript.js`, `youtubeTranscript.js`, `content_blocker.js`) are injected into pages to extract text, handle transcripts, and block sites.
+- Content scripts (`contentScript.js`, `youtubeTranscript.js`, `content_blocker.js`) are injected at document start: `content_blocker.js` runs first on blocked origins to apply early stop, request blocking, and overlay hiding.
 - ChatGPT integration (`chatgpt_inject.js`) uses ProseMirror-aware DOM manipulation to auto-fill and submit prompts with multiple selector fallbacks.
 - `Readability.js` is used for extracting the main article content from web pages.
 - Summaries and errors are displayed using dynamically injected scripts (`displaySummary.js`, `displayError.js`).
@@ -156,6 +156,16 @@ The extension can automatically open ChatGPT and submit content by:
 
 The system uses multiple selector strategies and retry logic to maintain compatibility as ChatGPT's interface evolves.
 
+### Paywall / site blocker
+
+On blocked origins the content script (`content_blocker.js`, `run_at: document_start`):
+
+1. **Early stop** — Waits for `document.body` (or a short timeout), then calls `window.stop()` so further scripts and requests (including paywall bootstrap) are aborted.
+2. **Request blocking** — Hooks `fetch` and `XMLHttpRequest` to block requests whose URL matches known paywall query patterns (e.g. member/paywall GraphQL), so those API calls never complete even if they are initiated.
+3. **Overlay neutralizer** — Injects CSS and a throttled `MutationObserver` to hide common paywall/piano/meter elements and restore scroll.
+
+Sites using Tinypass/Piano-style paywalls are the primary target; behaviour may vary by site.
+
 ## Licence
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
@@ -168,4 +178,4 @@ Contributions, issues, and feature requests are welcome. Feel free to fork the r
 
 ## Disclaimer
 
-This extension uses the OpenAI API and requires a valid API key. Usage costs may apply based on OpenAI's pricing. The site blocking feature attempts to stop page loading but may not be effective against all techniques used by websites.
+This extension uses the OpenAI API and requires a valid API key. Usage costs may apply based on OpenAI's pricing. The site blocking feature uses early stop, request blocking, and overlay hiding and may not work on all sites or against all paywall techniques.
