@@ -1,13 +1,5 @@
 // youtubeTranscript.js
 
-// Prevent duplicate message listeners by checking if we've already set up listeners
-if (window.summariseExtensionYouTubeScriptLoaded) {
-  console.log('YouTube script already loaded, skipping duplicate setup');
-  // Exit early to prevent duplicate message listeners
-} else {
-  window.summariseExtensionYouTubeScriptLoaded = true;
-  console.log('Setting up YouTube script message listeners');
-
 // Function to extract metadata and then initiate transcript extraction
 function extractYouTubeData(sendResponseCallback) {
   // Extract metadata
@@ -24,12 +16,13 @@ function extractYouTubeData(sendResponseCallback) {
 
   const metadata = { title, channel, publishedDate, url };
 
-  // Find and click the transcript button
-  const transcriptButton = document.querySelector('button[aria-label="Show transcript"], button[aria-label="Open transcript"]');
+  const transcriptButton = document.querySelector(
+    'button[aria-label="Show transcript"], button[aria-label="Open transcript"], button[aria-label*="ranscript" i]'
+  );
 
   if (transcriptButton) {
     transcriptButton.click();
-    waitForTranscript(metadata, sendResponseCallback); // Pass metadata and callback
+    setTimeout(() => waitForTranscript(metadata, sendResponseCallback), 1200);
   } else {
     console.error("Transcript button not found");
     sendResponseCallback({ action: "transcriptError", error: "Transcript button not found" });
@@ -41,31 +34,60 @@ function waitForTranscript(metadata, sendResponseCallback) {
   const maxWaitTime = 15000; // Maximum wait time in milliseconds
   const startTime = Date.now();
 
+  function getTranscriptFromItems(transcriptItems) {
+    return Array.from(transcriptItems)
+      .map(item => {
+        const timeElement = item.querySelector('.segment-timestamp, .ytwTranscriptSegmentViewModelTimestamp');
+        const textElement = item.querySelector('.segment-text, .yt-core-attributed-string[role="text"], span[role="text"]');
+        const time = timeElement ? timeElement.innerText.trim() : '';
+        const text = textElement ? textElement.innerText.trim() : '';
+        return `${time} ${text}`.trim();
+      })
+      .filter(line => line.length > 0)
+      .join('\n');
+  }
+
+  function getModernTranscriptItems() {
+    const modernPanel = document.querySelector(
+      'ytd-macro-markers-list-renderer[panel-target-id="PAmodern_transcript_view"], ytd-macro-markers-list-renderer[panel-content-visible]'
+    );
+    if (!modernPanel) {
+      return [];
+    }
+
+    return modernPanel.querySelectorAll(
+      'transcript-segment-view-model, .ytwTranscriptSegmentViewModelHost'
+    );
+  }
+
   const checkTranscript = () => {
-    const transcriptItems = document.querySelectorAll('ytd-transcript-segment-renderer');
+    // Primary selector used by YouTube's transcript panel
+    let transcriptItems = document.querySelectorAll('ytd-transcript-segment-renderer');
+    // Fallback: segment text might be in different structure on some pages
+    if (transcriptItems.length === 0) {
+      transcriptItems = document.querySelectorAll('[class*="segment-renderer"]');
+    }
+    // New YouTube transcript layout
+    if (transcriptItems.length === 0) {
+      transcriptItems = getModernTranscriptItems();
+    }
 
     if (transcriptItems.length > 0) {
-      const transcript = Array.from(transcriptItems)
-        .map(item => {
-          const timeElement = item.querySelector('.segment-timestamp');
-          const textElement = item.querySelector('.segment-text');
-          const time = timeElement ? timeElement.innerText.trim() : '';
-          const text = textElement ? textElement.innerText.trim() : '';
-          return `${time} ${text}`;
-        })
-        .join('\n');
+      const transcript = getTranscriptFromItems(transcriptItems);
+      if (transcript.trim().length > 0) {
+        sendResponseCallback({
+          action: "transcriptData",
+          transcript: transcript,
+          title: metadata.title,
+          channel: metadata.channel,
+          date: metadata.publishedDate,
+          url: metadata.url
+        });
+        return;
+      }
+    }
 
-      // Send back all data
-      sendResponseCallback({
-        action: "transcriptData", // Use a consistent action name
-        transcript: transcript,
-        title: metadata.title,
-        channel: metadata.channel,
-        date: metadata.publishedDate,
-        url: metadata.url
-      });
-
-    } else if (Date.now() - startTime < maxWaitTime) {
+    if (Date.now() - startTime < maxWaitTime) {
       setTimeout(checkTranscript, 500);
     } else {
       console.error("Transcript loading timed out");
@@ -76,10 +98,9 @@ function waitForTranscript(metadata, sendResponseCallback) {
   checkTranscript();
 }
 
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+window.summariseExtensionYouTubeHandleMessage = (request, sender, sendResponse) => {
   if (request.action === "extractTranscript") {
     console.log("Received request to extract transcript for summary...");
-    // For summarization, send back data compatible with summariseText
     extractYouTubeData(response => {
       if (response.action === "transcriptData") {
         chrome.runtime.sendMessage({
@@ -93,15 +114,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         chrome.runtime.sendMessage(response); // Forward the error
       }
     });
-    // Indicate that sendResponse will be called asynchronously (although we don't use it directly here)
-    return true;
-  } else if (request.action === "getTranscriptAndMetadata") {
-    console.log("Received request to get transcript and metadata for copying...");
-    // For copying, send back the full data package
-    extractYouTubeData(sendResponse); // Pass sendResponse directly as the callback
-    // Indicate that sendResponse will be called asynchronously
     return true;
   }
-});
+  if (request.action === "getTranscriptAndMetadata") {
+    console.log("Received request to get transcript and metadata for copying...");
+    extractYouTubeData(sendResponse);
+    return true;
+  }
+  return false;
+};
 
-} // End of duplicate prevention block
+if (!window.summariseExtensionYouTubeListenerInstalled) {
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    return window.summariseExtensionYouTubeHandleMessage(request, sender, sendResponse);
+  });
+  window.summariseExtensionYouTubeListenerInstalled = true;
+  console.log('Installed YouTube transcript message listener');
+} else {
+  console.log('Reused existing YouTube transcript listener with updated handler');
+}
