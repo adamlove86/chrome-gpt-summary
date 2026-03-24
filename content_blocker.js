@@ -1,16 +1,23 @@
 // content_blocker.js
 
 const PAYWALL_SELECTORS = [
-  '[id*="paywall"]',
-  '[class*="paywall"]',
-  '[id*="piano"]',
-  '[class*="piano"]',
-  '[id*="meter"]',
-  '[class*="meter"]',
-  '[id*="subscribe"]',
-  '[class*="subscribe"]',
-  '[id*="tinypass"]',
-  '[class*="tinypass"]',
+  '#paywall-prompt-wrapper-piano-id',
+  '#paywall-prompt-piano-id',
+  '#soft-reg-wall-piano-id',
+  '#hard-reg-wall-piano-id',
+  '#meter-prompt-piano-id',
+  '#eoa-meter-prompt-piano-id',
+  '#meter-toaster-piano-id',
+  '#app-prompt-piano-id',
+  '#app-collapsible-prompt-piano-id',
+  '[id*="paywall-prompt"]',
+  '[id*="meter-prompt"]',
+  '[id*="soft-reg-wall"]',
+  '[id*="hard-reg-wall"]',
+  '[class*="paywall-prompt"]',
+  '[class*="soft-reg-wall"]',
+  '[class*="hard-reg-wall"]',
+  '[class*="meter-toaster"]',
   '[data-testid*="paywall"]',
   '[aria-label*="subscribe" i]'
 ].join(", ");
@@ -86,10 +93,6 @@ function neutralizePaywallElements() {
 
 function hasContentShell() {
   return Boolean(document.body && (document.querySelector("article") || document.querySelector("main")));
-}
-
-function hasBasicShell() {
-  return Boolean(document.body && document.documentElement);
 }
 
 function hasBootstrapScriptInDom() {
@@ -176,6 +179,19 @@ function installRequestBlockers(currentOrigin) {
   };
 }
 
+function injectPageWorldRequestBlockers() {
+  if (window.__popupBlockerPageScriptInjected) {
+    return;
+  }
+  window.__popupBlockerPageScriptInjected = true;
+
+  const script = document.createElement("script");
+  script.src = chrome.runtime.getURL("paywall_page_hook.js");
+  script.async = false;
+  script.onload = () => script.remove();
+  (document.documentElement || document.head || document.body).appendChild(script);
+}
+
 function stopNearPaywallBootstrap(currentOrigin) {
   const maxWaitMs = 5000;
   const startedAt = Date.now();
@@ -194,7 +210,7 @@ function stopNearPaywallBootstrap(currentOrigin) {
 
   const maybeStop = (reason) => {
     // Prefer stopping close to paywall bootstrap to avoid both white pages and late 404 overlays.
-    if (sawBootstrapScript && hasBasicShell()) {
+    if (sawBootstrapScript && hasContentShell()) {
       stopNow(reason);
       return true;
     }
@@ -275,17 +291,7 @@ function stopNearPaywallBootstrap(currentOrigin) {
 }
 
 function startBlockedSiteHandling(currentOrigin) {
-  const initialStopDeadlineMs = Date.now() + 1200;
-  const initialStop = () => {
-    if (document.body || Date.now() >= initialStopDeadlineMs) {
-      console.log(`[Popup Blocker] Initial early stop for ${currentOrigin}`);
-      window.stop();
-      return;
-    }
-    setTimeout(initialStop, 40);
-  };
-  initialStop();
-
+  injectPageWorldRequestBlockers();
   installRequestBlockers(currentOrigin);
   ensureBypassStyle();
   unlockPageScroll();

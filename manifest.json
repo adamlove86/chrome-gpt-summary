@@ -47,6 +47,7 @@
         "contentScript.js",
         "chatgpt_inject.js",
         "sidebarStyles.css",
+        "paywall_page_hook.js",
         "youtube-prompt.md",
         "text-prompt.md"
       ],
