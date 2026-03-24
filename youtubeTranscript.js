@@ -48,28 +48,52 @@ function waitForTranscript(metadata, sendResponseCallback) {
   }
 
   function getModernTranscriptItems() {
+    // Preferred: modern transcript panel host
     const modernPanel = document.querySelector(
       'ytd-macro-markers-list-renderer[panel-target-id="PAmodern_transcript_view"], ytd-macro-markers-list-renderer[panel-content-visible]'
     );
-    if (!modernPanel) {
-      return [];
+    if (modernPanel) {
+      const panelItems = modernPanel.querySelectorAll(
+        'transcript-segment-view-model, .ytwTranscriptSegmentViewModelHost'
+      );
+      if (panelItems.length > 0) {
+        return panelItems;
+      }
     }
 
-    return modernPanel.querySelectorAll(
-      'transcript-segment-view-model, .ytwTranscriptSegmentViewModelHost'
+    // Newer variants can render timeline transcript without stable panel attrs.
+    const timelinePanel = document.querySelector(
+      'ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-timeline-view-consolidated"]'
     );
+    if (timelinePanel) {
+      const timelineItems = timelinePanel.querySelectorAll(
+        'transcript-segment-view-model, .ytwTranscriptSegmentViewModelHost'
+      );
+      if (timelineItems.length > 0) {
+        return timelineItems;
+      }
+    }
+
+    // Last-resort modern selector: directly look for transcript segment view models.
+    return document.querySelectorAll('transcript-segment-view-model, .ytwTranscriptSegmentViewModelHost');
   }
 
   const checkTranscript = () => {
-    // Primary selector used by YouTube's transcript panel
-    let transcriptItems = document.querySelectorAll('ytd-transcript-segment-renderer');
-    // Fallback: segment text might be in different structure on some pages
-    if (transcriptItems.length === 0) {
-      transcriptItems = document.querySelectorAll('[class*="segment-renderer"]');
-    }
+    let transcriptItems = [];
+
     // New YouTube transcript layout
     if (transcriptItems.length === 0) {
       transcriptItems = getModernTranscriptItems();
+    }
+    // Primary selector used by older YouTube transcript panel
+    if (transcriptItems.length === 0) {
+      transcriptItems = document.querySelectorAll('ytd-transcript-segment-renderer');
+    }
+    // Narrow fallback for older segment markup variants
+    if (transcriptItems.length === 0) {
+      transcriptItems = document.querySelectorAll(
+        'ytd-transcript-segment-renderer .segment-text, ytd-transcript-segment-renderer .segment-timestamp'
+      );
     }
 
     if (transcriptItems.length > 0) {
