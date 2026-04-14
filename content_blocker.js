@@ -36,7 +36,9 @@ const PAYWALL_REQUEST_PATTERNS = [
   "paywallbypass(",
   "paywallbypassinput",
   "graphql?query=query%20paywall",
-  "graphql?query=query%20memberandsubscriptions"
+  "graphql?query=query%20memberandsubscriptions",
+  "chartbeat.net/ping/conversion_event",
+  "cec=paywall"
 ];
 
 function ensureBypassStyle() {
@@ -106,8 +108,40 @@ function hasBootstrapScriptInDom() {
   return false;
 }
 
+function readNextDataJson() {
+  const script = document.getElementById("__NEXT_DATA__");
+  const raw = script?.textContent;
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function hasAtlanticMeterSignal() {
+  if (!window.location.hostname.endsWith("theatlantic.com")) {
+    return false;
+  }
+
+  const nextData = readNextDataJson();
+  if (!nextData || typeof nextData !== "object") {
+    return false;
+  }
+
+  const hasPaywallAccess = nextData.props?.hasPaywallAccess;
+  const hasMeter = nextData.props?.pageProps?.hasMeter;
+  return hasPaywallAccess === false && hasMeter === true;
+}
+
 function hasPaywallSignal() {
   if (hasBootstrapScriptInDom()) {
+    return true;
+  }
+  if (hasAtlanticMeterSignal()) {
     return true;
   }
   return Boolean(document.querySelector(PAYWALL_SELECTORS));

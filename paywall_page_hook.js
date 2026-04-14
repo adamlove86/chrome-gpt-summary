@@ -15,7 +15,9 @@
     "paywallbypassinput",
     "c2-au.piano.io/xbuilder/experience/execute",
     "buy-au.piano.io/api/v3/anon/template/loadtemplatecontext",
-    "buy-au.piano.io/checkout/template/cacheableshow.html"
+    "buy-au.piano.io/checkout/template/cacheableshow.html",
+    "chartbeat.net/ping/conversion_event",
+    "cec=paywall"
   ];
 
   const toNormalized = (url) => {
@@ -33,6 +35,124 @@
     }
     return BLOCK_PATTERNS.some((pattern) => normalized.includes(pattern));
   };
+
+  const patchPaywallState = (value) => {
+    if (!value || typeof value !== "object") {
+      return false;
+    }
+
+    const seen = new WeakSet();
+    const stack = [value];
+    let changed = false;
+
+    while (stack.length) {
+      const current = stack.pop();
+      if (!current || typeof current !== "object" || seen.has(current)) {
+        continue;
+      }
+
+      seen.add(current);
+
+      if (Object.prototype.hasOwnProperty.call(current, "hasPaywallAccess") && current.hasPaywallAccess === false) {
+        current.hasPaywallAccess = true;
+        changed = true;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(current, "hasMeter") && current.hasMeter === true) {
+        current.hasMeter = false;
+        changed = true;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(current, "preview") && current.preview === true) {
+        current.preview = false;
+        changed = true;
+      }
+
+      for (const child of Object.values(current)) {
+        if (child && typeof child === "object") {
+          stack.push(child);
+        }
+      }
+    }
+
+    return changed;
+  };
+
+  const patchNextDataScript = (script) => {
+    if (!script || script.__popupBlockerPatched || script.id !== "__NEXT_DATA__") {
+      return false;
+    }
+
+    const raw = script.textContent;
+    if (!raw) {
+      return false;
+    }
+
+    try {
+      const data = JSON.parse(raw);
+      const changed = patchPaywallState(data);
+      script.__popupBlockerPatched = true;
+      if (changed) {
+        script.textContent = JSON.stringify(data);
+      }
+      return changed;
+    } catch {
+      return false;
+    }
+  };
+
+  const patchExistingNextData = () => {
+    patchNextDataScript(document.getElementById("__NEXT_DATA__"));
+  };
+
+  const installNextDataWatcher = () => {
+    patchExistingNextData();
+
+    try {
+      let nextDataValue = window.__NEXT_DATA__;
+      patchPaywallState(nextDataValue);
+
+      Object.defineProperty(window, "__NEXT_DATA__", {
+        configurable: true,
+        get() {
+          return nextDataValue;
+        },
+        set(value) {
+          patchPaywallState(value);
+          nextDataValue = value;
+        }
+      });
+    } catch {
+      patchPaywallState(window.__NEXT_DATA__);
+    }
+
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (node?.nodeType !== Node.ELEMENT_NODE) {
+            continue;
+          }
+
+          if (node.id === "__NEXT_DATA__") {
+            patchNextDataScript(node);
+            continue;
+          }
+
+          if (typeof node.querySelector === "function") {
+            patchNextDataScript(node.querySelector("#__NEXT_DATA__"));
+          }
+        }
+      }
+    });
+
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", patchExistingNextData, { once: true });
+    }
+  };
+
+  installNextDataWatcher();
 
   const originalFetch = window.fetch;
   if (typeof originalFetch === "function") {
