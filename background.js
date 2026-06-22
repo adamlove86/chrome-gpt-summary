@@ -2,6 +2,7 @@
 // IMPORTANT: This file runs as a service worker. It must not reference any DOM objects.
 
 import { getDefaultYouTubePrompt, getDefaultTextPrompt } from './prompt.js';
+import { DEFAULT_MODEL, applyModelRequestParameters } from './modelConfig.js';
 
 // Append a message with timestamp to the persistent debug log in local storage
 function appendLog(message) {
@@ -214,21 +215,13 @@ async function summariseText(text, pageUrl, contentType, pageTitle, publishedDat
   chrome.storage.sync.get(["youtubePrompt", "textPrompt", "model", "maxTokens", "temperature", "debug"], async (data) => {
     const youtubePrompt = data.youtubePrompt || await getDefaultYouTubePrompt();
     const textPrompt = data.textPrompt || await getDefaultTextPrompt();
-    const model = data.model || "gpt-4o-mini";
-    const maxTokens = data.maxTokens || 1000;
-    const temperature = data.temperature || 0.7;
+    const model = data.model || DEFAULT_MODEL;
+    const maxTokens = data.maxTokens ?? 1000;
+    const temperature = data.temperature ?? 0.7;
     const debug = data.debug || false;
 
-    let prompt = contentType === 'youtube' ? youtubePrompt : textPrompt;
+    const prompt = contentType === 'youtube' ? youtubePrompt : textPrompt;
     const wordCount = text.trim().split(/\s+/).length;
-
-    if (contentType === 'youtube') {
-      prompt += "\n\nPlease provide a detailed summary following the guidelines. Do not include any headers or titles like 'Overall Summary' or 'Summary' in your response.";
-    } else {
-      prompt += wordCount < 500
-        ? "\n\nPlease provide a concise, single-paragraph summary. Do not include any headers or titles like 'Overall Summary' or 'Summary' in your response."
-        : "\n\nPlease provide a detailed summary following the guidelines. Do not include any headers or titles like 'Overall Summary' or 'Summary' in your response.";
-    }
 
     const apiKey = await getApiKey();
     if (!apiKey) {
@@ -240,29 +233,21 @@ async function summariseText(text, pageUrl, contentType, pageTitle, publishedDat
     try {
       appendLog("Sending request to OpenAI API.");
 
-      // Build request body for Chat Completions; switch token param for GPT-5 models
-      const isGpt5 = typeof model === 'string' && model.toLowerCase().startsWith('gpt-5');
-      let usedModel = model;
-      let fallbackReason = '';
+      // Build a model-aware Chat Completions request. GPT-5 reasoning models
+      // reject sampling parameters such as temperature in common configurations.
       const body = {
         model: model,
         messages: [
           {
             role: "system",
-            content: "You are a helpful assistant that creates well-formatted summaries. Always use proper markdown formatting including **bold** for important terms, *italics* for emphasis and headings, and proper line breaks between paragraphs and sections. Ensure your response maintains clear visual structure with proper spacing."
+            content: "Create a faithful summary using only the supplied source. Follow the user's output format and style instructions exactly. Do not add outside facts."
           },
           { role: "user", content: `${prompt}\n\n${text}` }
-        ],
-        temperature: temperature
+        ]
       };
-      if (isGpt5) {
-        // GPT-5 family expects max_completion_tokens
-        body.max_completion_tokens = maxTokens;
-      } else {
-        body.max_tokens = maxTokens;
-      }
+      applyModelRequestParameters(body, model, maxTokens, temperature);
 
-      let response = await fetch("https://api.openai.com/v1/chat/completions", {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -271,43 +256,19 @@ async function summariseText(text, pageUrl, contentType, pageTitle, publishedDat
         body: JSON.stringify(body)
       });
 
-      // If GPT-5 call fails due to unsupported model/param, fall back to gpt-4o-mini
-      if (!response.ok && isGpt5) {
-        const errText = await response.text();
-        appendLog("Primary GPT-5 request failed (" + response.status + "): " + errText);
-        // Fallback to gpt-4o-mini with max_tokens
-        const fallbackModel = 'gpt-4o-mini';
-        appendLog("Falling back to " + fallbackModel + ".");
-        usedModel = fallbackModel;
-        try {
-          const errJson = JSON.parse(errText);
-          fallbackReason = errJson && errJson.error && errJson.error.message ? errJson.error.message : ("HTTP " + response.status);
-        } catch (_) {
-          fallbackReason = ("HTTP " + response.status);
-        }
-        const fallbackBody = {
-          model: fallbackModel,
-          messages: body.messages,
-          max_tokens: maxTokens,
-          temperature: temperature
-        };
-        response = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`
-          },
-          body: JSON.stringify(fallbackBody)
-        });
-      }
-
       const result = await response.json();
       appendLog("API response: " + JSON.stringify(result));
-      if (result.error) {
-        throw new Error(result.error.message);
+      if (!response.ok || result.error) {
+        const apiMessage = result?.error?.message || `OpenAI request failed with HTTP ${response.status}`;
+        throw new Error(`${model}: ${apiMessage}`);
       }
       if (result.choices && result.choices.length > 0) {
-        const summary = result.choices[0].message.content.trim();
+        const rawSummary = result.choices[0]?.message?.content;
+        if (typeof rawSummary !== 'string' || rawSummary.trim() === '') {
+          const finishReason = result.choices[0]?.finish_reason || 'unknown';
+          throw new Error(`${model}: OpenAI returned no visible summary (finish reason: ${finishReason}). Try increasing Max Tokens.`);
+        }
+        const summary = rawSummary.trim();
         appendLog("Summary received from API. Word count: " + wordCount + "; Summary length: " + summary.length);
         chrome.storage.local.set({
           latestSummary: summary,
@@ -316,9 +277,9 @@ async function summariseText(text, pageUrl, contentType, pageTitle, publishedDat
           pageTitle: pageTitle,
           publishedDate: publishedDate,
           wordCount: wordCount,
-          modelUsed: usedModel,
-        fallbackReason: fallbackReason,
-        summaryType: 'summary' // Explicitly mark this sidebar content as a summary (not article)
+          modelUsed: result.model || model,
+          fallbackReason: '',
+          summaryType: 'summary' // Explicitly mark this sidebar content as a summary (not article)
         }, () => {
           appendLog("Summary stored. Injecting displaySummary.js in tab " + tabId);
           chrome.scripting.executeScript({
@@ -331,9 +292,13 @@ async function summariseText(text, pageUrl, contentType, pageTitle, publishedDat
       }
     } catch (error) {
       appendLog("Error summarising text: " + error.message);
+      chrome.storage.local.set({
+        latestSummaryError: error.message,
+        latestSummaryErrorAt: new Date().toISOString()
+      });
       console.error("Error summarising text:", error);
       if (debug) alert("Error: " + error.message);
-      else alert("Failed to summarise the text. Please check your API key and settings.");
+      else alert("Failed to summarise: " + error.message);
     }
   });
 }

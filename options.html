@@ -8,6 +8,9 @@
             font-family: sans-serif;
             padding: 10px 20px;
             min-width: 500px; /* Increased width */
+            max-width: 760px;
+            margin: 0 auto;
+            color: #202124;
         }
         h1, h2 {
             margin-bottom: 10px;
@@ -26,6 +29,7 @@
             width: 95%; /* Adjusted width */
             padding: 5px;
             margin-top: 3px;
+            box-sizing: border-box;
         }
         textarea {
             min-height: 80px;
@@ -80,6 +84,47 @@
         #speechSpeedValue {
             margin-left: 10px;
         }
+        .field-help {
+            display: block;
+            margin-top: 5px;
+            color: #5f6368;
+            font-size: 12px;
+        }
+        .model-details {
+            width: 95%;
+            box-sizing: border-box;
+            display: grid;
+            gap: 6px;
+            margin-top: 8px;
+            padding: 12px;
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            background: #f8f9fa;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        .model-details-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .model-badge {
+            padding: 2px 7px;
+            border-radius: 999px;
+            background: #e8f0fe;
+            color: #174ea6;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .pricing-date {
+            color: #5f6368;
+            font-size: 11px;
+        }
+        input:disabled {
+            background: #f1f3f4;
+            color: #80868b;
+        }
 
         /* Add style for pressed buttons */
         .button-pressed {
@@ -99,12 +144,14 @@
 
         <label for="model">Model:</label>
         <select id="model"></select>
+        <div id="modelDetails" class="model-details" aria-live="polite"></div>
 
         <label for="maxTokens">Max Tokens:</label>
         <input type="number" id="maxTokens" required>
 
         <label for="temperature">Temperature:</label>
         <input type="number" id="temperature" step="0.1" min="0" max="1" required>
+        <span id="temperatureHelp" class="field-help"></span>
 
         <label for="debug">
             <input type="checkbox" id="debug">

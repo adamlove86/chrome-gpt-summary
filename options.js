@@ -1,6 +1,7 @@
 // options.js
 
 import { getDefaultYouTubePrompt, getDefaultTextPrompt, getDefaultPrefacePrompt, getDefaultYouTubePrefacePrompt } from './prompt.js';
+import { DEFAULT_MODEL, MODEL_OPTIONS, PRICING_AS_OF, formatTokenPrice, getModelConfig } from './modelConfig.js';
 
 // --- Global Variables ---
 let availableVoices = [];
@@ -21,6 +22,7 @@ function handleButtonPress(buttonId) {
 const settingsForm = document.getElementById('settingsForm');
 const apiKeyInput = document.getElementById('apiKey');
 const modelInput = document.getElementById('model');
+const modelDetails = document.getElementById('modelDetails');
 const maxTokensInput = document.getElementById('maxTokens');
 const temperatureInput = document.getElementById('temperature');
 const debugCheckbox = document.getElementById('debug');
@@ -47,7 +49,7 @@ const downloadLogBtn = document.getElementById('downloadLogBtn');
 async function loadSettings() {
   chrome.storage.sync.get({
     apiKey: '',
-    model: 'gpt-5-mini',
+    model: DEFAULT_MODEL,
     maxTokens: 1000,
     temperature: 0.7,
     debug: false,
@@ -61,9 +63,9 @@ async function loadSettings() {
     logLineLimit: 30 // Keep the new log line limit setting
   }, async (data) => {
     document.getElementById('apiKey').value = data.apiKey || "";
-    populateModelSelect(data.model || "gpt-5-mini");
-    document.getElementById('maxTokens').value = data.maxTokens || 1000;
-    document.getElementById('temperature').value = data.temperature || 0.7;
+    populateModelSelect(data.model || DEFAULT_MODEL);
+    document.getElementById('maxTokens').value = data.maxTokens ?? 1000;
+    document.getElementById('temperature').value = data.temperature ?? 0.7;
     document.getElementById('debug').checked = data.debug || false;
     
     // Load prompts from markdown files if not set in storage
@@ -96,7 +98,8 @@ function saveSettings(event) {
   const apiKey = document.getElementById('apiKey').value;
   const model = document.getElementById('model').value;
   const maxTokens = parseInt(document.getElementById('maxTokens').value, 10) || 1000;
-  const temperature = parseFloat(document.getElementById('temperature').value) || 0.7;
+  const parsedTemperature = parseFloat(document.getElementById('temperature').value);
+  const temperature = Number.isNaN(parsedTemperature) ? 0.7 : parsedTemperature;
   const debug = document.getElementById('debug').checked;
   const youtubePrompt = document.getElementById('youtubePrompt').value;
   const textPrompt = document.getElementById('textPrompt').value;
@@ -136,32 +139,54 @@ function populateModelSelect(selectedModel) {
   const selectEl = modelInput;
   if (!selectEl) return;
 
-  const models = [
-    { id: 'gpt-5-mini', label: 'gpt-5-mini (GPT-5 family)' },
-    { id: 'gpt-4o-mini', label: 'gpt-4o-mini (fast/cheap)' },
-    { id: 'gpt-4o', label: 'gpt-4o' }
-  ];
-
   // Clear existing
   selectEl.innerHTML = '';
 
   // Add known models
-  models.forEach(m => {
+  MODEL_OPTIONS.forEach((model) => {
     const opt = document.createElement('option');
-    opt.value = m.id;
-    opt.textContent = m.label;
+    opt.value = model.id;
+    opt.textContent = `${model.name} — ${formatTokenPrice(model.inputPrice)} in / ${formatTokenPrice(model.outputPrice)} out`;
     selectEl.appendChild(opt);
   });
 
   // If a stored/custom model isn't in the list, add it so it remains selectable
-  if (selectedModel && !models.some(m => m.id === selectedModel)) {
+  if (selectedModel && !MODEL_OPTIONS.some((model) => model.id === selectedModel)) {
     const customOpt = document.createElement('option');
     customOpt.value = selectedModel;
     customOpt.textContent = `${selectedModel} (custom)`;
     selectEl.appendChild(customOpt);
   }
 
-  selectEl.value = selectedModel || 'gpt-5-mini';
+  selectEl.value = selectedModel || DEFAULT_MODEL;
+  updateModelDetails();
+}
+
+function updateModelDetails() {
+  const selectedModel = getModelConfig(modelInput.value);
+  const temperature = document.getElementById('temperature');
+  const temperatureHelp = document.getElementById('temperatureHelp');
+
+  if (!selectedModel) {
+    modelDetails.innerHTML = '<strong>Custom model</strong><span>Pricing and parameter support are not known to the extension.</span>';
+    temperature.disabled = false;
+    temperatureHelp.textContent = 'Used only when the selected model supports custom temperature.';
+    return;
+  }
+
+  modelDetails.innerHTML = `
+    <div class="model-details-heading">
+      <strong>${selectedModel.name}</strong>
+      <span class="model-badge">${selectedModel.badge}</span>
+    </div>
+    <span>${selectedModel.description}</span>
+    <span><strong>Standard text pricing:</strong> ${formatTokenPrice(selectedModel.inputPrice)} input · ${formatTokenPrice(selectedModel.outputPrice)} output</span>
+    <span class="pricing-date">Checked ${PRICING_AS_OF}. OpenAI may change pricing.</span>
+  `;
+  temperature.disabled = !selectedModel.supportsTemperature;
+  temperatureHelp.textContent = selectedModel.supportsTemperature
+    ? 'Controls variation for this model.'
+    : 'Not sent for this GPT-5 model, avoiding the parameter error that caused the old fallback.';
 }
 
 // Populate voice dropdown list
@@ -323,6 +348,7 @@ if (saveSettingsBtn) {
   console.error("Save settings button not found!");
 }
 speechSpeedRange.addEventListener('input', updateSpeechSpeedDisplay); // Update speed display
+modelInput.addEventListener('change', updateModelDetails);
 addSiteBtn.addEventListener('click', addSite); // Add site button
 newSiteOriginInput.addEventListener('keypress', (event) => { // Add site on Enter key
   if (event.key === 'Enter') {

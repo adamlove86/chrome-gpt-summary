@@ -1,6 +1,6 @@
-# Summarise with GPT-4o-mini Chrome Extension
+# Summarise with GPT Chrome Extension
 
-A Chrome extension that summarises web pages, selected text, and YouTube transcripts using the OpenAI API (defaulting to GPT-4o-mini). It also includes ChatGPT integration for asking questions and fact-checking, plus a simple paywall blocker feature. This plugin is designed to help you quickly generate concise or detailed summaries and verify information directly in your browser.
+A Chrome extension that summarises web pages, selected text, and YouTube transcripts using the OpenAI API (defaulting to GPT-5.4 nano). It also includes ChatGPT integration for asking questions and fact-checking, plus a simple paywall blocker feature. This plugin is designed to help you quickly generate concise or detailed summaries and verify information directly in your browser.
 
 ![Extension Popup](summarise.png)
 
@@ -23,9 +23,9 @@ A Chrome extension that summarises web pages, selected text, and YouTube transcr
   - Summarise the current page or highlighted text via right-click.
   - Read full articles or selected text aloud via right-click TTS options.
 - **Configurable Summarization:**
-  - Choose the OpenAI model (e.g., `gpt-4o-mini`, `gpt-4`, etc.).
+  - Choose from current low-cost OpenAI models with standard input/output pricing shown in the dropdown.
   - Set maximum tokens for the summary.
-  - Adjust the creativity/randomness using the temperature setting.
+  - Adjust creativity with temperature on models that support it; the setting is disabled for GPT-5 models where it is not sent.
   - Define custom system prompts for both general text and YouTube transcript summarization.
 - **Site Blocker (paywall bypass):** Maintain a list of website origins to block. On blocked sites the extension injects page-context request hooks to block known paywall API/bootstrap calls, applies targeted paywall overlay neutralization, and can stop loading near paywall bootstrap if needed. Add origins via the popup or options page. Works best on Tinypass/Piano-style paywalls; effectiveness depends on site structure.
 - **API Key Management:** Securely store your OpenAI API key in Chrome's sync storage or load it locally from a `key.txt` file (useful for development, ignored by `.gitignore`).
@@ -57,7 +57,7 @@ A Chrome extension that summarises web pages, selected text, and YouTube transcr
 
 ### 3. Configure the Extension
 
-1.  Click the extension's icon (puzzle piece icon) in your browser toolbar and find the "Summarise with GPT-4o-mini" icon. You might need to pin it for easy access.
+1.  Click the extension's icon (puzzle piece icon) in your browser toolbar and find "Summarise with GPT". You might need to pin it for easy access.
 2.  Click the extension icon to open the popup.
 3.  Go to **Options**.
 4.  **API Key:**

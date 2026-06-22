@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Summarise with GPT-4o-mini",
-  "version": "1.7.3",
-  "description": "Summarises text from web pages or YouTube transcripts using the ChatGPT API.",
+  "name": "Summarise with GPT",
+  "version": "1.8.0",
+  "description": "Summarises text from web pages or YouTube transcripts using the OpenAI API.",
   "permissions": [
     "activeTab",
     "storage",
@@ -40,6 +40,7 @@
         "Readability.js",
         "JSDOMParser.js",
         "prompt.js",
+        "modelConfig.js",
         "key.txt",
         "displaySummary.js",
         "displayError.js",

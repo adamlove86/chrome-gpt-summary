@@ -34,7 +34,7 @@ Rules:
 
 4. Use timestamps selectively.
 
-* Include timestamps only for the most useful points.
+* Include timestamps for each point.
 * Use 1 to 3 timestamps total for short or medium videos, up to 4 for longer structured videos.
 * Put timestamps at the end of the relevant bullet in this format: *mm:ss*.
 * Do not add timestamps to every bullet.

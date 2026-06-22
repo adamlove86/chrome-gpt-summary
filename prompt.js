@@ -125,7 +125,7 @@ async function getDefaultPrefacePrompt() {
     }
 
     // Fallback to hardcoded prompt if file loading fails
-    return "I have questions about this article. Please review the complete text provided below. The full article content is included here, so you don't need to access any external links right now.";
+    return "I have questions about this article. Please review the complete text provided below. The full article content is included here, so you don't need to access any external links right now. Please summarise it, and I will pose the question(s) in my next message.";
 }
 
 // Load YouTube preface prompt from markdown file
@@ -141,11 +141,9 @@ async function getDefaultYouTubePrefacePrompt() {
     }
 
     // Fallback to hardcoded prompt if file loading fails
-    return "I have questions about this YouTube video. Please review the text below.";
+    return "I have questions about this YouTube video. Please summarise it, and I will pose the question(s) in my next message.";
 }
 
 // Export functions to use in other files
 export { getDefaultYouTubePrompt, getDefaultTextPrompt, getDefaultPrefacePrompt, getDefaultYouTubePrefacePrompt };
- 
-
  

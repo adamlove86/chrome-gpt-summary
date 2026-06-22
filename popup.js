@@ -1,5 +1,6 @@
 // popup.js
 import { getDefaultYouTubePrompt, getDefaultTextPrompt } from './prompt.js';
+import { DEFAULT_MODEL } from './modelConfig.js';
 
 // Get references to buttons
 const summariseBtn = document.getElementById('summariseBtn');
@@ -55,7 +56,7 @@ function initializePopup() {
 
   // Get model name and update title
   chrome.storage.sync.get(["model"], (data) => {
-    const model = data.model || "gpt-4o-mini"; // Default model
+    const model = data.model || DEFAULT_MODEL;
     if (popupTitle) {
       popupTitle.textContent = `Summarise Text with ${model}`;
     }
